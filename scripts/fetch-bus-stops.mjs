@@ -1,5 +1,5 @@
 // Fetches all NYCT bus stops from the Bus Time REST API and produces:
-//   lib/bus-stops.json — { "MTA_XXXXXX": { name: string, routes: string[] } }
+//   lib/bus-stops.json — { "MTA_XXXXXX": { name, lat, lon, routes, direction } }
 import { writeFileSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -18,6 +18,11 @@ function toTitleCase(str) {
   return str.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
+// "DOWNTOWN BKLYN TILLARY ST via HALSEY" → "Downtown Bklyn Tillary St"
+function extractDirection(rawName) {
+  return toTitleCase(rawName.replace(/\s+via\s+.*/i, "").trim());
+}
+
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
@@ -29,7 +34,7 @@ const routesData = await fetchJson(`${BASE}/routes-for-agency/MTA%20NYCT.json?ke
 const routes = routesData.data?.list ?? [];
 console.log(`Found ${routes.length} routes`);
 
-const stops = {}; // MTA_STOPID → { name: string, routes: Set<string> }
+const stops = {}; // MTA_STOPID → { name, lat, lon, direction, routes: Set<string> }
 
 async function fetchStopsForRoute(route) {
   const routeId = encodeURIComponent(route.id);
@@ -38,12 +43,50 @@ async function fetchStopsForRoute(route) {
     const data = await fetchJson(
       `${BASE}/stops-for-route/${routeId}.json?key=${KEY}&includePolylines=false`
     );
-    const stopList = data?.data?.references?.stops ?? data?.data?.stops ?? [];
-    for (const stop of stopList) {
-      if (!stops[stop.id]) stops[stop.id] = { name: toTitleCase(stop.name), lat: stop.lat, lon: stop.lon, routes: new Set() };
-      stops[stop.id].routes.add(shortName);
+
+    // Build a lookup of stopId → stop ref
+    const stopRefs = {};
+    for (const s of (data?.data?.stops ?? [])) {
+      stopRefs[s.id] = s;
     }
-    return stopList.length;
+
+    // Use stopGroupings to get direction per stop
+    const stopGroupings = data?.data?.stopGroupings ?? [];
+    let count = 0;
+    for (const grouping of stopGroupings) {
+      for (const group of grouping.stopGroups ?? []) {
+        const direction = extractDirection(group.name?.name ?? "");
+        for (const stopId of group.stopIds ?? []) {
+          const s = stopRefs[stopId];
+          if (!s) continue;
+          if (!stops[stopId]) {
+            stops[stopId] = {
+              name: toTitleCase(s.name),
+              lat: s.lat,
+              lon: s.lon,
+              direction,
+              routes: new Set(),
+            };
+          }
+          stops[stopId].routes.add(shortName);
+          count++;
+        }
+      }
+    }
+
+    // Fallback: if no stopGroupings, use flat stops list
+    if (count === 0) {
+      const stopList = data?.data?.stops ?? [];
+      for (const s of stopList) {
+        if (!stops[s.id]) {
+          stops[s.id] = { name: toTitleCase(s.name), lat: s.lat, lon: s.lon, direction: "", routes: new Set() };
+        }
+        stops[s.id].routes.add(shortName);
+        count++;
+      }
+    }
+
+    return count;
   } catch (err) {
     console.warn(`  Skipped ${shortName}: ${err.message}`);
     return 0;
@@ -62,7 +105,10 @@ for (let i = 0; i < routes.length; i += BATCH) {
 
 // Serialise Sets → sorted arrays
 const output = Object.fromEntries(
-  Object.entries(stops).map(([id, { name, lat, lon, routes }]) => [id, { name, lat, lon, routes: [...routes].sort() }])
+  Object.entries(stops).map(([id, { name, lat, lon, direction, routes }]) => [
+    id,
+    { name, lat, lon, direction, routes: [...routes].sort() },
+  ])
 );
 
 const outPath = path.join(__dir, "../lib/bus-stops.json");

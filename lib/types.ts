@@ -7,6 +7,7 @@ export interface Stop {
   lines: string[];    // e.g. ["A", "C", "E"] or ["M15", "M15 SBS"]
   lat?: number;
   lon?: number;
+  direction?: string; // Bus stops only — e.g. "Downtown Bklyn Tillary St"
 }
 
 export interface Arrival {

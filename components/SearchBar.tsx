@@ -102,6 +102,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
                           </span>
                           <span className="text-[12px] text-[#777D88]">
                             {stop.lines.join(" · ")}
+                            {stop.direction && ` · ${stop.direction}`}
                           </span>
                         </button>
                       );
