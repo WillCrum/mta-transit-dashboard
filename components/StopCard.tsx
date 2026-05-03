@@ -112,6 +112,11 @@ export default function StopCard({ stop, onRemove }: Props) {
 
       <hr className="border-[#ECEDF0]" />
 
+      {/* Alerts */}
+      <AlertBar alerts={alerts ?? []} />
+
+      <hr className="border-[#ECEDF0]" />
+
       {/* Map toggle — bus cards only */}
       {isBus && (
         <>
@@ -137,7 +142,7 @@ export default function StopCard({ stop, onRemove }: Props) {
           >
             <div className="overflow-hidden">
               {mapEverOpened.current && (
-                <div className="h-48 border-b border-[#ECEDF0]">
+                <div className="h-48 border-t border-b border-[#ECEDF0]">
                   {data?.stop.lat && data.stop.lon ? (
                     <BusMap lat={data.stop.lat} lon={data.stop.lon} routes={stop.lines} />
                   ) : (
@@ -153,11 +158,6 @@ export default function StopCard({ stop, onRemove }: Props) {
           <hr className="border-[#ECEDF0]" />
         </>
       )}
-
-      {/* Alerts */}
-      <AlertBar alerts={alerts ?? []} />
-
-      <hr className="border-[#ECEDF0]" />
 
       {/* Arrivals */}
       {error && !data ? (

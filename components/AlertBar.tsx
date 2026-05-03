@@ -125,16 +125,17 @@ export default function AlertBar({ alerts }: Props) {
 
   // ── 2+ alerts — collapsible summary row ───────────────────────────────────
   const onlyElevator = nService === 0;
-  const dotColor  = onlyElevator ? "#FCCC0A" : "#FF6319";
-  const textColor = onlyElevator ? "#786100" : "#783C00";
-  const bgColor   = onlyElevator ? "#FFFDE2"  : "#FFF6EB";
+  const dotColor   = onlyElevator ? "#FCCC0A" : "#FF6319";
+  const textColor  = onlyElevator ? "#786100" : "#783C00";
+  const bgColor    = onlyElevator ? "#FFFDE2"  : "#FFF6EB";
+  const hoverClass = onlyElevator ? "hover:bg-[#FFF8C0]" : "hover:bg-[#FFECD4]";
 
   return (
     <div>
       {/* Summary / toggle row */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-2 px-4 py-2.5 w-full text-left"
+        className={`flex items-center gap-2 px-4 py-2.5 w-full text-left transition-colors ${hoverClass}`}
         style={{ background: bgColor }}
       >
         <span
@@ -151,7 +152,7 @@ export default function AlertBar({ alerts }: Props) {
         />
       </button>
 
-      {/* Animated expansion */}
+      {/* Animated expansion — border-t separates summary from first alert */}
       <div
         style={{
           display: "grid",
@@ -159,7 +160,7 @@ export default function AlertBar({ alerts }: Props) {
           transition: "grid-template-rows 300ms ease",
         }}
       >
-        <div className="overflow-hidden divide-y divide-[#ECEDF0]">
+        <div className="overflow-hidden border-t border-[#ECEDF0] divide-y divide-[#ECEDF0]">
           {orderedAlerts.map((a) => (
             <AlertItem key={a.id} alert={a} />
           ))}
