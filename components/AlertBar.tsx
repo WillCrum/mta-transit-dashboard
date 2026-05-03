@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, ChevronRight } from "lucide-react";
 import type { Alert } from "@/lib/types";
 
 interface Props {
@@ -27,7 +27,6 @@ function AlertIcon({ type, textColor }: { type: Alert["type"]; textColor: string
   if (type === "ELEVATOR") {
     return <ArrowUpDown size={16} className="flex-shrink-0 mt-0.5" style={{ color: textColor }} />;
   }
-  // Inline SVG: solid filled triangle with exclamation, CSS-colorable
   return (
     <svg
       width="16"
@@ -83,12 +82,30 @@ function AlertItem({ alert }: { alert: Alert }) {
   );
 }
 
-export default function AlertBar({ alerts }: Props) {
-  const elevatorAlerts = alerts.filter((a) => a.type === "ELEVATOR");
-  const serviceAlerts  = alerts.filter((a) => a.type === "SERVICE");
-  const orderedAlerts  = [...elevatorAlerts, ...serviceAlerts];
+// Build the summary label, omitting zero-count segments, singular/plural aware
+function buildSummary(nService: number, nElevator: number): string {
+  const parts: string[] = [];
+  if (nService > 0)
+    parts.push(`${nService} active service ${nService === 1 ? "alert" : "alerts"}`);
+  if (nElevator > 0)
+    parts.push(`${nElevator} elevator ${nElevator === 1 ? "alert" : "alerts"}`);
+  return parts.join(" · ");
+}
 
-  if (orderedAlerts.length === 0) {
+export default function AlertBar({ alerts }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Service alerts first, elevator/escalator alerts below
+  const serviceAlerts  = alerts.filter((a) => a.type === "SERVICE");
+  const elevatorAlerts = alerts.filter((a) => a.type === "ELEVATOR");
+  const orderedAlerts  = [...serviceAlerts, ...elevatorAlerts];
+
+  const total     = orderedAlerts.length;
+  const nService  = serviceAlerts.length;
+  const nElevator = elevatorAlerts.length;
+
+  // ── 0 alerts ──────────────────────────────────────────────────────────────
+  if (total === 0) {
     return (
       <div className="flex items-center gap-2 px-4 py-2.5 bg-[#F6FCF7]">
         <span className="w-2 h-2 rounded-full bg-[#00933C] flex-shrink-0" />
@@ -97,11 +114,57 @@ export default function AlertBar({ alerts }: Props) {
     );
   }
 
+  // ── 1 alert — show inline, no chrome ──────────────────────────────────────
+  if (total === 1) {
+    return (
+      <div>
+        <AlertItem alert={orderedAlerts[0]} />
+      </div>
+    );
+  }
+
+  // ── 2+ alerts — collapsible summary row ───────────────────────────────────
+  const onlyElevator = nService === 0;
+  const dotColor  = onlyElevator ? "#FCCC0A" : "#FF6319";
+  const textColor = onlyElevator ? "#786100" : "#783C00";
+  const bgColor   = onlyElevator ? "#FFFDE2"  : "#FFF6EB";
+
   return (
-    <div className="divide-y divide-[#ECEDF0]">
-      {orderedAlerts.map((a) => (
-        <AlertItem key={a.id} alert={a} />
-      ))}
+    <div>
+      {/* Summary / toggle row */}
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-2 px-4 py-2.5 w-full text-left"
+        style={{ background: bgColor }}
+      >
+        <span
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{ background: dotColor }}
+        />
+        <span className="text-[13px] flex-1" style={{ color: textColor }}>
+          {buildSummary(nService, nElevator)}
+        </span>
+        <ChevronRight
+          size={16}
+          className="flex-shrink-0 transition-transform duration-300"
+          style={{ color: textColor, transform: expanded ? "rotate(90deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      {/* Animated expansion */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: expanded ? "1fr" : "0fr",
+          transition: "grid-template-rows 300ms ease",
+        }}
+      >
+        <div className="overflow-hidden divide-y divide-[#ECEDF0]">
+          {orderedAlerts.map((a) => (
+            <AlertItem key={a.id} alert={a} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
