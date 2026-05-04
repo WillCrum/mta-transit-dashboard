@@ -1,8 +1,23 @@
 "use client";
 import { useState, useEffect } from "react";
 import { MapPinPlus } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  arrayMove,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
 import SearchBar from "@/components/SearchBar";
-import StopCard from "@/components/StopCard";
+import SortableStopCard from "@/components/SortableStopCard";
 import type { Stop } from "@/lib/types";
 
 const STORAGE_KEY = "mta-dashboard-stops";
@@ -46,6 +61,23 @@ export default function Home() {
     });
   }
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setStops((prev) => {
+      const oldIndex = prev.findIndex((s) => s.id === active.id);
+      const newIndex = prev.findIndex((s) => s.id === over.id);
+      const next = arrayMove(prev, oldIndex, newIndex);
+      saveStops(next);
+      return next;
+    });
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   const selectedIds = new Set(stops.map((s) => s.id));
 
   return (
@@ -80,15 +112,23 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {stops.map((stop) => (
-              <StopCard
-                key={stop.id}
-                stop={stop}
-                onRemove={() => removeStop(stop.id)}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={stops.map((s) => s.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {stops.map((stop) => (
+                  <SortableStopCard
+                    key={stop.id}
+                    stop={stop}
+                    onRemove={() => removeStop(stop.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </main>
     </div>

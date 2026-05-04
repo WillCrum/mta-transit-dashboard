@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { Map, ChevronRight, X, RefreshCw, AlertCircle, Clock } from "lucide-react";
+import { Map, ChevronRight, X, RefreshCw, AlertCircle, Clock, GripVertical } from "lucide-react";
 import BusMap from "./BusMap";
 import LineBadge from "./LineBadge";
 import AlertBar from "./AlertBar";
@@ -12,6 +12,7 @@ import { REFRESH_INTERVAL_MS } from "@/lib/constants";
 interface Props {
   stop: Stop;
   onRemove: () => void;
+  dragHandleProps?: Record<string, unknown>;
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -31,7 +32,7 @@ function useSecondsAgo(updatedAt: number | undefined) {
   return seconds;
 }
 
-export default function StopCard({ stop, onRemove }: Props) {
+export default function StopCard({ stop, onRemove, dragHandleProps }: Props) {
   const [mapOpen, setMapOpen] = useState(false);
   const mapEverOpened = useRef(false);
   if (mapOpen) mapEverOpened.current = true;
@@ -71,6 +72,15 @@ export default function StopCard({ stop, onRemove }: Props) {
     <div className="bg-white rounded-xl overflow-hidden shadow-sm flex flex-col">
       {/* Header */}
       <div className="flex items-stretch gap-2 px-4 pt-3.5 pb-3">
+        {dragHandleProps && (
+          <div
+            {...dragHandleProps}
+            className="flex items-center self-stretch -ml-1 mr-0.5 cursor-grab active:cursor-grabbing text-[#C8CBD2] hover:text-[#777D88] touch-none transition-colors"
+            aria-label="Drag to reorder"
+          >
+            <GripVertical size={16} />
+          </div>
+        )}
         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {stop.lines.slice(0, 4).map((l) => (
