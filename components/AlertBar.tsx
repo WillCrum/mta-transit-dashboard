@@ -125,18 +125,19 @@ export default function AlertBar({ alerts }: Props) {
 
   // ── 2+ alerts — collapsible summary row ───────────────────────────────────
   const onlyElevator = nService === 0;
-  const dotColor   = onlyElevator ? "#FCCC0A" : "#FF6319";
-  const textColor  = onlyElevator ? "#786100" : "#783C00";
-  const bgColor    = onlyElevator ? "#FFFDE2"  : "#FFF6EB";
+  const dotColor  = onlyElevator ? "#FCCC0A" : "#FF6319";
+  const textColor = onlyElevator ? "#786100" : "#783C00";
+  // Tailwind classes (not inline styles) so hover overrides work correctly
+  const bgClass    = onlyElevator ? "bg-[#FFFDE2]"    : "bg-[#FFF6EB]";
   const hoverClass = onlyElevator ? "hover:bg-[#FFF8C0]" : "hover:bg-[#FFECD4]";
 
   return (
     <div>
-      {/* Summary / toggle row */}
+      {/* Summary / toggle row — border-b appears only when expanded so it's
+          exactly 1px between the button and the first alert item */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className={`flex items-center gap-2 px-4 py-2.5 w-full text-left transition-colors ${hoverClass}`}
-        style={{ background: bgColor }}
+        className={`flex items-center gap-2 px-4 py-2.5 w-full text-left transition-colors ${bgClass} ${hoverClass} ${expanded ? "border-b border-[#ECEDF0]" : ""}`}
       >
         <span
           className="w-2 h-2 rounded-full flex-shrink-0"
@@ -152,7 +153,7 @@ export default function AlertBar({ alerts }: Props) {
         />
       </button>
 
-      {/* Animated expansion — border-t separates summary from first alert */}
+      {/* Animated expansion */}
       <div
         style={{
           display: "grid",
@@ -160,7 +161,7 @@ export default function AlertBar({ alerts }: Props) {
           transition: "grid-template-rows 300ms ease",
         }}
       >
-        <div className="overflow-hidden border-t border-[#ECEDF0] divide-y divide-[#ECEDF0]">
+        <div className="overflow-hidden divide-y divide-[#ECEDF0]">
           {orderedAlerts.map((a) => (
             <AlertItem key={a.id} alert={a} />
           ))}
