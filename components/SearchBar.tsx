@@ -8,6 +8,13 @@ interface Props {
   selectedIds: Set<string>;
 }
 
+const PLACEHOLDERS = [
+  "Search by station or bus stop name",
+  'Type “/” to search by train or bus line',
+];
+const DISPLAY_MS = 2000;
+const FADE_MS    = 150;
+
 function StopButton({
   stop,
   onSelect,
@@ -41,14 +48,38 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   const [open, setOpen]           = useState(false);
   const [focused, setFocused]     = useState(false);
   const [noResults, setNoResults] = useState(false);
+
+  // Animated placeholder state
+  const [phIndex, setPhIndex]     = useState(0);
+  const [phVisible, setPhVisible] = useState(true);
+
   const inputRef    = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cycle placeholder text: show → fade out → swap → fade in → repeat
+  useEffect(() => {
+    let tDisplay: ReturnType<typeof setTimeout>;
+    let tSwap:    ReturnType<typeof setTimeout>;
+
+    function cycle() {
+      tDisplay = setTimeout(() => {
+        setPhVisible(false);                         // start fade-out
+        tSwap = setTimeout(() => {
+          setPhIndex((i) => (i + 1) % PLACEHOLDERS.length);
+          setPhVisible(true);                        // start fade-in
+          cycle();                                   // schedule next cycle
+        }, FADE_MS);
+      }, DISPLAY_MS);
+    }
+
+    cycle();
+    return () => { clearTimeout(tDisplay); clearTimeout(tSwap); };
+  }, []);
 
   const isLineBrowse = query.startsWith("/");
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    // Allow 2+ chars normally; for line-browse "/" + at least one code char = 2 chars
     if (query.length < 2) { setResults([]); setOpen(false); setNoResults(false); return; }
 
     debounceRef.current = setTimeout(async () => {
@@ -80,20 +111,34 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           size={16}
           className={`flex-shrink-0 transition-colors ${focused ? "text-[#003DA5]" : "text-[#777D88]"}`}
         />
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={
-            isLineBrowse
-              ? "Type a line — /G, /L, /B62…"
-              : "Search for a station or stop…"
-          }
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => { setFocused(true); results.length > 0 && setOpen(true); }}
-          onBlur={() => { setFocused(false); setTimeout(() => setOpen(false), 150); }}
-          className="flex-1 bg-transparent text-[14px] text-[#1A1D23] placeholder:text-[#777D88] outline-none"
-        />
+
+        {/* Input + animated fake placeholder in the same flex cell */}
+        <div className="relative flex-1 flex items-center h-full">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder=""
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => { setFocused(true); results.length > 0 && setOpen(true); }}
+            onBlur={() => { setFocused(false); setTimeout(() => setOpen(false), 150); }}
+            className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
+          />
+
+          {/* Fake placeholder — hidden once the user starts typing */}
+          {!query && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 flex items-center text-[14px] text-[#777D88] whitespace-nowrap overflow-hidden"
+              style={{
+                opacity: phVisible ? 1 : 0,
+                transition: `opacity ${FADE_MS}ms ease`,
+              }}
+            >
+              {PLACEHOLDERS[phIndex]}
+            </span>
+          )}
+        </div>
       </div>
 
       {open && (
@@ -107,7 +152,6 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               <p className="text-[12px] text-[#777D88]">Check for typos and try again</p>
             </div>
           ) : isLineBrowse ? (
-            /* ── Line-browse results — flat list under a single header ── */
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto">
               <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
                 {query.slice(1).toUpperCase()} · {results.length} stop{results.length !== 1 ? "s" : ""}
@@ -119,7 +163,6 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               </div>
             </div>
           ) : (
-            /* ── Normal results — grouped by SUBWAY / BUS ── */
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
               {(["SUBWAY", "BUS"] as const).map((type) => {
                 const group = results.filter((s) => s.type === type);
