@@ -67,9 +67,13 @@ http.get(GTFS_URL, (res) => {
   if (res.statusCode !== 200) { console.error("HTTP", res.statusCode); process.exit(1); }
 
   const stops       = {};   // stop_id → name (parent stations only)
+  const stopCoords  = {};   // stop_id → { lat, lon }
   const routes      = {};   // stop_id → Set<route_id>
   const tripToRoute = {};   // trip_id → route_id
   const tripStops   = {};   // trip_id → [{parentId, seq}]
+
+  // Lines that run east–west: order west → east (ascending longitude)
+  const EAST_WEST_LINES = new Set(["L", "7", "7X"]);
 
   // Collect raw file buffers while streaming the zip
   const fileBuffers = {};
@@ -89,10 +93,16 @@ http.get(GTFS_URL, (res) => {
       const name = row.stop_name;
       if (!id || !name) return;
       const locType = row.location_type;
+      const lat = parseFloat(row.stop_lat);
+      const lon = parseFloat(row.stop_lon);
       if (locType === "1") {
         stops[id] = name;
+        if (!isNaN(lat) && !isNaN(lon)) stopCoords[id] = { lat, lon };
       } else if (locType !== "0") {
-        if (!/[NS]$/.test(id)) stops[id] = name;
+        if (!/[NS]$/.test(id)) {
+          stops[id] = name;
+          if (!isNaN(lat) && !isNaN(lon)) stopCoords[id] = { lat, lon };
+        }
       }
     });
 
@@ -146,10 +156,26 @@ http.get(GTFS_URL, (res) => {
       }
       if (!bestTrip || !tripStops[bestTrip]) continue;
       const seen = new Set();
-      lineOrder[routeId] = tripStops[bestTrip]
+      let ordered = tripStops[bestTrip]
         .sort((a, b) => a.seq - b.seq)
         .map((s) => s.parentId)
         .filter((id) => seen.has(id) ? false : seen.add(id));
+
+      // Normalize direction: downtown→uptown (south→north) for most lines,
+      // west→east for L and 7/7X.
+      const first = stopCoords[ordered[0]];
+      const last  = stopCoords[ordered[ordered.length - 1]];
+      if (first && last) {
+        if (EAST_WEST_LINES.has(routeId)) {
+          // Want west (low lon) → east (high lon); reverse if first is east of last
+          if (first.lon > last.lon) ordered = ordered.slice().reverse();
+        } else {
+          // Want south (low lat) → north (high lat); reverse if first is north of last
+          if (first.lat > last.lat) ordered = ordered.slice().reverse();
+        }
+      }
+
+      lineOrder[routeId] = ordered;
     }
 
     // Serialise Sets → sorted arrays
