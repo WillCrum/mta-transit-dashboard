@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { Map, ChevronRight, X, RefreshCw, AlertCircle, Clock, GripVertical } from "lucide-react";
+import { Map, ChevronRight, X, RefreshCw, AlertCircle, Clock } from "lucide-react";
 import BusMap from "./BusMap";
 import LineBadge from "./LineBadge";
 import AlertBar from "./AlertBar";
@@ -70,18 +70,12 @@ export default function StopCard({ stop, onRemove, dragHandleProps }: Props) {
 
   return (
     <div className="bg-white rounded-xl overflow-hidden shadow-sm flex flex-col">
-      {/* Header */}
+      {/* Header — left area is the drag handle when dragHandleProps is provided */}
       <div className="flex items-stretch gap-2 px-4 pt-3.5 pb-3">
-        {dragHandleProps && (
-          <div
-            {...dragHandleProps}
-            className="flex items-center self-stretch -ml-1 mr-0.5 cursor-grab active:cursor-grabbing text-[#C8CBD2] hover:text-[#777D88] touch-none transition-colors"
-            aria-label="Drag to reorder"
-          >
-            <GripVertical size={16} />
-          </div>
-        )}
-        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+        <div
+          className={`flex flex-col gap-1.5 flex-1 min-w-0 touch-none${dragHandleProps ? " cursor-grab active:cursor-grabbing select-none" : ""}`}
+          {...(dragHandleProps ?? {})}
+        >
           <div className="flex items-center gap-1">
             {stop.lines.slice(0, 4).map((l) => (
               <LineBadge key={l} line={l} />

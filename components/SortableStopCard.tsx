@@ -23,7 +23,7 @@ export default function SortableStopCard({ stop, onRemove }: Props) {
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
+        transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.35 : 1,
         zIndex: isDragging ? 10 : undefined,
