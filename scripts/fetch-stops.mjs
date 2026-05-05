@@ -1,6 +1,7 @@
 // Downloads MTA subway GTFS and produces:
 //   lib/subway-stops.json       — { stop_id: stop_name }
 //   lib/subway-stop-routes.json — { stop_id: [route_id, ...] }
+//   lib/subway-line-order.json  — { route_id: [stop_id, ...] } canonical trip order
 import http from "http";
 import { writeFileSync } from "fs";
 import unzipper from "unzipper";
@@ -65,9 +66,10 @@ function parseStream(stream, onRow) {
 http.get(GTFS_URL, (res) => {
   if (res.statusCode !== 200) { console.error("HTTP", res.statusCode); process.exit(1); }
 
-  const stops  = {};   // stop_id → name (parent stations only)
-  const routes = {};   // stop_id → Set<route_id>
-  const tripToRoute = {};  // trip_id → route_id
+  const stops       = {};   // stop_id → name (parent stations only)
+  const routes      = {};   // stop_id → Set<route_id>
+  const tripToRoute = {};   // trip_id → route_id
+  const tripStops   = {};   // trip_id → [{parentId, seq}]
 
   // Collect raw file buffers while streaming the zip
   const fileBuffers = {};
@@ -99,7 +101,7 @@ http.get(GTFS_URL, (res) => {
       if (row.trip_id && row.route_id) tripToRoute[row.trip_id] = row.route_id;
     });
 
-    // 3. Parse stop_times.txt — build stop_id → Set<route_id>
+    // 3. Parse stop_times.txt — build stop_id → Set<route_id> and trip sequences
     //    Only use parent stop_ids (strip N/S suffix), only allowed routes
     await parseStream(Readable.from(fileBuffers["stop_times.txt"]), (row) => {
       const rawStop = row.stop_id ?? "";
@@ -107,13 +109,47 @@ http.get(GTFS_URL, (res) => {
       if (!stops[stopId]) return;
       const routeId = tripToRoute[row.trip_id ?? ""];
       if (!routeId || !ALLOWED_ROUTES.has(routeId)) return;
+
+      // stop → routes mapping (existing)
       if (!routes[stopId]) routes[stopId] = new Set();
       routes[stopId].add(routeId);
+
+      // trip sequence (new) — used to derive canonical line order
+      const tripId = row.trip_id;
+      if (!tripStops[tripId]) tripStops[tripId] = [];
+      tripStops[tripId].push({ parentId: stopId, seq: parseInt(row.stop_sequence, 10) || 0 });
     });
 
     // Remove stops that ended up with no allowed routes (e.g. GS shuttle-only stop 902)
     for (const id of Object.keys(stops)) {
       if (!routes[id] || routes[id].size === 0) delete stops[id];
+    }
+
+    // 4. Build canonical line order: for each route, pick the trip with the most
+    //    unique parent stops and record them in stop_sequence order.
+    const routeTrips = {}; // routeId → [tripId]
+    for (const [tripId, routeId] of Object.entries(tripToRoute)) {
+      if (!ALLOWED_ROUTES.has(routeId)) continue;
+      if (!routeTrips[routeId]) routeTrips[routeId] = [];
+      routeTrips[routeId].push(tripId);
+    }
+
+    const lineOrder = {};
+    for (const [routeId, tripIds] of Object.entries(routeTrips)) {
+      let bestTrip = null;
+      let bestCount = 0;
+      for (const tripId of tripIds) {
+        const ts = tripStops[tripId];
+        if (!ts) continue;
+        const unique = new Set(ts.map((s) => s.parentId)).size;
+        if (unique > bestCount) { bestCount = unique; bestTrip = tripId; }
+      }
+      if (!bestTrip || !tripStops[bestTrip]) continue;
+      const seen = new Set();
+      lineOrder[routeId] = tripStops[bestTrip]
+        .sort((a, b) => a.seq - b.seq)
+        .map((s) => s.parentId)
+        .filter((id) => seen.has(id) ? false : seen.add(id));
     }
 
     // Serialise Sets → sorted arrays
@@ -123,7 +159,9 @@ http.get(GTFS_URL, (res) => {
 
     writeFileSync(path.join(__dir, "../lib/subway-stops.json"), JSON.stringify(stops, null, 2));
     writeFileSync(path.join(__dir, "../lib/subway-stop-routes.json"), JSON.stringify(routesJson, null, 2));
+    writeFileSync(path.join(__dir, "../lib/subway-line-order.json"), JSON.stringify(lineOrder, null, 2));
     console.log(`Wrote ${Object.keys(stops).length} parent stations → lib/subway-stops.json`);
     console.log(`Wrote route mappings for ${Object.keys(routesJson).length} stops → lib/subway-stop-routes.json`);
+    console.log(`Wrote stop order for ${Object.keys(lineOrder).length} routes → lib/subway-line-order.json`);
   }).on("error", (e) => { console.error(e); process.exit(1); });
 }).on("error", (e) => { console.error(e); process.exit(1); });

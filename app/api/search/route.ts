@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Stop } from "@/lib/types";
-import subwayStopsJson  from "@/lib/subway-stops.json";
-import subwayRoutesJson from "@/lib/subway-stop-routes.json";
-import busStopsJson     from "@/lib/bus-stops.json";
+import subwayStopsJson    from "@/lib/subway-stops.json";
+import subwayRoutesJson   from "@/lib/subway-stop-routes.json";
+import subwayLineOrderJson from "@/lib/subway-line-order.json";
+import busStopsJson       from "@/lib/bus-stops.json";
 
-const subwayStops  = subwayStopsJson  as Record<string, string>;
-const subwayRoutes = subwayRoutesJson as Record<string, string[]>;
-const busStops     = busStopsJson     as Record<string, { name: string; routes: string[]; lat?: number; lon?: number; direction?: string }>;
+const subwayStops  = subwayStopsJson      as Record<string, string>;
+const subwayRoutes = subwayRoutesJson     as Record<string, string[]>;
+const lineOrder    = subwayLineOrderJson  as Record<string, string[]>;
+const busStops     = busStopsJson         as Record<string, { name: string; routes: string[]; lat?: number; lon?: number; direction?: string }>;
+
+/** Sort stops by canonical trip order; unrecognised stops fall to the end. */
+function sortByLineOrder(results: Stop[], codes: string[]): void {
+  // Build a combined ordered list: for /s this is GS→FS→H in sequence order
+  const combined = codes.flatMap((c) => lineOrder[c] ?? []);
+  const orderMap = new Map(combined.map((id, i) => [id, i]));
+  results.sort((a, b) => (orderMap.get(a.id) ?? 9999) - (orderMap.get(b.id) ?? 9999));
+}
 
 export async function GET(req: NextRequest) {
   const raw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -30,7 +40,7 @@ export async function GET(req: NextRequest) {
         });
       }
     }
-    lineResults.sort((a, b) => a.name.localeCompare(b.name));
+    sortByLineOrder(lineResults, matchCodes);
 
     const busLineResults: Stop[] = [];
     for (const [id, { name, routes, direction }] of Object.entries(busStops)) {
