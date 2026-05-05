@@ -33,8 +33,11 @@ export const LINE_COLORS: Record<string, { bg: string; text: string }> = {
   // Teal
   "J": { bg: "#996633", text: "#fff" },
   "Z": { bg: "#996633", text: "#fff" },
-  // Dark slate
-  "S": { bg: "#808183", text: "#fff" },
+  // Dark slate — shuttle trains (GS = 42nd St, FS = Franklin Av, H = Rockaway Park)
+  "S":  { bg: "#808183", text: "#fff" },
+  "GS": { bg: "#808183", text: "#fff" },
+  "FS": { bg: "#808183", text: "#fff" },
+  "H":  { bg: "#808183", text: "#fff" },
   // Express variants
   "6X": { bg: "#00933C", text: "#fff" },
   "7X": { bg: "#B933AD", text: "#fff" },

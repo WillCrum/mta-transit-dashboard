@@ -13,10 +13,12 @@ const __dir = path.dirname(fileURLToPath(import.meta.url));
 
 const GTFS_URL = "http://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip";
 
-// Only real revenue subway routes with GTFS-RT feeds
+// Only real revenue subway routes with GTFS-RT feeds.
+// Shuttle route IDs in GTFS: GS (42nd St), FS (Franklin Av), H (Rockaway Park).
 const ALLOWED_ROUTES = new Set([
   "1","2","3","4","5","6","6X","7","7X",
-  "A","B","C","D","E","F","G","J","L","M","N","Q","R","W","Z"
+  "A","B","C","D","E","F","G","J","L","M","N","Q","R","W","Z",
+  "GS","FS","H",
 ]);
 
 console.log("Downloading MTA subway GTFS…");

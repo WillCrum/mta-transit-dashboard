@@ -6,8 +6,11 @@ const BASE = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds";
 export const LINE_TO_FEED: Record<string, string> = {
   "1": "nyct%2Fgtfs",  "2": "nyct%2Fgtfs",  "3": "nyct%2Fgtfs",
   "4": "nyct%2Fgtfs",  "5": "nyct%2Fgtfs",  "6": "nyct%2Fgtfs",
-  "7": "nyct%2Fgtfs",  "7X": "nyct%2Fgtfs", "6X": "nyct%2Fgtfs", "S": "nyct%2Fgtfs",
+  "7": "nyct%2Fgtfs",  "7X": "nyct%2Fgtfs", "6X": "nyct%2Fgtfs",
+  // Shuttle trains: GS = 42nd St, FS = Franklin Av, H = Rockaway Park
+  "GS": "nyct%2Fgtfs",
   "A": "nyct%2Fgtfs-ace", "C": "nyct%2Fgtfs-ace", "E": "nyct%2Fgtfs-ace",
+  "FS": "nyct%2Fgtfs-ace", "H": "nyct%2Fgtfs-ace",
   "B": "nyct%2Fgtfs-bdfm","D": "nyct%2Fgtfs-bdfm","F": "nyct%2Fgtfs-bdfm","M": "nyct%2Fgtfs-bdfm",
   "G": "nyct%2Fgtfs-g",
   "J": "nyct%2Fgtfs-jz", "Z": "nyct%2Fgtfs-jz",

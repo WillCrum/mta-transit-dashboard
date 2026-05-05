@@ -5,13 +5,19 @@ interface Props {
   size?: "sm" | "md";
 }
 
+// All three shuttle variants share the MTA "S" visual identity
+const SHUTTLE_IDS = new Set(["GS", "FS", "H"]);
+
 export default function LineBadge({ line, size = "md" }: Props) {
-  const colors = LINE_COLORS[line.toUpperCase()] ?? LINE_COLORS["BUS"];
+  const upper = line.toUpperCase();
+  // Normalize shuttle GTFS route IDs → display as "S"
+  const display = SHUTTLE_IDS.has(upper) ? "S" : line;
+  const colors  = LINE_COLORS[upper] ?? LINE_COLORS["BUS"];
   const isSmall = size === "sm";
 
   // Express trains (6X, 7X) — diamond badge
-  if (/^\d+[Xx]$/.test(line)) {
-    const displayText = line.slice(0, -1) + "x";
+  if (/^\d+[Xx]$/.test(display)) {
+    const displayText = display.slice(0, -1) + "x";
     const outer = isSmall ? 22 : 28;
     const inner = isSmall ? 16 : 20;
     const fontSize = isSmall ? 8 : 10;
@@ -40,15 +46,15 @@ export default function LineBadge({ line, size = "md" }: Props) {
     );
   }
 
-  // Single-character lines — circle
-  if (line.length === 1) {
+  // Single-character lines (and shuttles normalized to "S") — circle
+  if (display.length === 1) {
     const dim = isSmall ? "w-5 h-5 text-[10px]" : "w-6 h-6 text-[11px]";
     return (
       <span
         className={`inline-flex items-center justify-center font-semibold rounded-full flex-shrink-0 ${dim}`}
         style={{ background: colors.bg, color: colors.text }}
       >
-        {line}
+        {display}
       </span>
     );
   }
@@ -61,7 +67,7 @@ export default function LineBadge({ line, size = "md" }: Props) {
       }`}
       style={{ background: colors.bg, color: colors.text, whiteSpace: "nowrap" }}
     >
-      {line}
+      {display}
     </span>
   );
 }
