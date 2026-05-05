@@ -16,9 +16,12 @@ export async function GET(req: NextRequest) {
     const lineCode = raw.slice(1).toUpperCase();
     if (!lineCode) return NextResponse.json([]);
 
+    // "/s" expands to all three shuttle variants so they appear together
+    const matchCodes = lineCode === "S" ? ["GS", "FS", "H"] : [lineCode];
+
     const lineResults: Stop[] = [];
     for (const [id, lines] of Object.entries(subwayRoutes)) {
-      if ((lines as string[]).includes(lineCode)) {
+      if ((lines as string[]).some((l) => matchCodes.includes(l))) {
         lineResults.push({
           id,
           name: (subwayStops as Record<string, string>)[id] ?? id,

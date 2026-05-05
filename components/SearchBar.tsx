@@ -8,6 +8,14 @@ interface Props {
   selectedIds: Set<string>;
 }
 
+// When the user types "/s", results come back with GS/FS/H in their lines
+// arrays. We split them into three named groups for display.
+const SHUTTLE_GROUPS = [
+  { code: "GS", label: "42ND ST SHUTTLE" },
+  { code: "FS", label: "FRANKLIN AV SHUTTLE" },
+  { code: "H",  label: "ROCKAWAY PARK SHUTTLE" },
+] as const;
+
 const PLACEHOLDERS = [
   "Search by station or bus stop name",
   'Type “/” to search by train or bus line',
@@ -155,15 +163,40 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               <p className="text-[12px] text-[#777D88]">Check for typos and try again</p>
             </div>
           ) : isLineBrowse ? (
-            <div className="max-h-[min(320px,50dvh)] overflow-y-auto">
-              <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
-                {query.slice(1).toUpperCase()} · {results.length} stop{results.length !== 1 ? "s" : ""}
-              </p>
-              <div className="divide-y divide-[#ECEDF0]">
-                {results.map((stop) => (
-                  <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
-                ))}
-              </div>
+            <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
+              {query.toUpperCase() === "/S" ? (
+                // Shuttle search — split into three named groups
+                SHUTTLE_GROUPS.map(({ code, label }) => {
+                  const group = results.filter((s) =>
+                    s.lines.some((l) => l.toUpperCase() === code)
+                  );
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={code}>
+                      <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                        S · {label}
+                      </p>
+                      <div className="divide-y divide-[#ECEDF0]">
+                        {group.map((stop) => (
+                          <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                // Normal line-browse — flat list
+                <div>
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                    {query.slice(1).toUpperCase()} · {results.length} stop{results.length !== 1 ? "s" : ""}
+                  </p>
+                  <div className="divide-y divide-[#ECEDF0]">
+                    {results.map((stop) => (
+                      <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
