@@ -12,8 +12,9 @@ const PLACEHOLDERS = [
   "Search by station or bus stop name",
   'Type “/” to search by train or bus line',
 ];
-const DISPLAY_MS = 2000;
-const FADE_MS    = 150;
+const DISPLAY_MS  = 5000;
+const FADE_OUT_MS = 500;
+const FADE_IN_MS  = 100;
 
 function StopButton({
   stop,
@@ -68,7 +69,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           setPhIndex((i) => (i + 1) % PLACEHOLDERS.length);
           setPhVisible(true);                        // start fade-in
           cycle();                                   // schedule next cycle
-        }, FADE_MS);
+        }, FADE_OUT_MS);
       }, DISPLAY_MS);
     }
 
@@ -132,7 +133,9 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               className="pointer-events-none absolute inset-0 flex items-center text-[14px] text-[#777D88] whitespace-nowrap overflow-hidden"
               style={{
                 opacity: phVisible ? 1 : 0,
-                transition: `opacity ${FADE_MS}ms ease`,
+                transition: phVisible
+                  ? `opacity ${FADE_IN_MS}ms ease`
+                  : `opacity ${FADE_OUT_MS}ms ease`,
               }}
             >
               {PLACEHOLDERS[phIndex]}
