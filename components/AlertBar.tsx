@@ -62,7 +62,7 @@ function AlertItem({ alert }: { alert: Alert }) {
         <div className="min-w-0">
           <p
             ref={textRef}
-            className={`text-[13px] leading-5 ${!expanded ? "line-clamp-2" : ""}`}
+            className={`text-[13px] leading-5 ${expanded ? "" : overflows ? "line-clamp-2" : "line-clamp-3"}`}
             style={{ color: styles.textColor }}
           >
             {alert.summary}
