@@ -9,7 +9,40 @@ const subwayRoutes = subwayRoutesJson as Record<string, string[]>;
 const busStops     = busStopsJson     as Record<string, { name: string; routes: string[]; lat?: number; lon?: number; direction?: string }>;
 
 export async function GET(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? "";
+  const raw = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+
+  // ── Line-browse mode: query starts with "/" ──────────────────────────────
+  if (raw.startsWith("/")) {
+    const lineCode = raw.slice(1).toUpperCase();
+    if (!lineCode) return NextResponse.json([]);
+
+    const lineResults: Stop[] = [];
+    for (const [id, lines] of Object.entries(subwayRoutes)) {
+      if ((lines as string[]).includes(lineCode)) {
+        lineResults.push({
+          id,
+          name: (subwayStops as Record<string, string>)[id] ?? id,
+          type: "SUBWAY",
+          lines: lines as string[],
+        });
+      }
+    }
+    lineResults.sort((a, b) => a.name.localeCompare(b.name));
+
+    const busLineResults: Stop[] = [];
+    for (const [id, { name, routes, direction }] of Object.entries(busStops)) {
+      if (busLineResults.length >= 150) break;
+      if (routes.some((r) => r.toUpperCase() === lineCode)) {
+        busLineResults.push({ id, name, type: "BUS", lines: routes, direction });
+      }
+    }
+    busLineResults.sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json([...lineResults, ...busLineResults]);
+  }
+
+  // ── Normal stop/name search ───────────────────────────────────────────────
+  const q = raw.toLowerCase();
   if (q.length < 2) return NextResponse.json([]);
 
   const results: Stop[] = [];

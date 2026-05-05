@@ -8,17 +8,47 @@ interface Props {
   selectedIds: Set<string>;
 }
 
+function StopButton({
+  stop,
+  onSelect,
+  selectedIds,
+}: {
+  stop: Stop;
+  onSelect: (s: Stop) => void;
+  selectedIds: Set<string>;
+}) {
+  const already = selectedIds.has(stop.id);
+  return (
+    <button
+      onMouseDown={() => { if (!already) onSelect(stop); }}
+      disabled={already}
+      className={`w-full text-left px-4 py-2.5 flex flex-col gap-0.5 transition-colors ${
+        already ? "opacity-40 cursor-default" : "hover:bg-[#F2F4F8] cursor-pointer"
+      }`}
+    >
+      <span className="text-[14px] font-medium text-[#1A1D23]">{stop.name}</span>
+      <span className="text-[12px] text-[#777D88]">
+        {stop.lines.join(" · ")}
+        {stop.direction && ` · ${stop.direction}`}
+      </span>
+    </button>
+  );
+}
+
 export default function SearchBar({ onSelect, selectedIds }: Props) {
-  const [query, setQuery]       = useState("");
-  const [results, setResults]   = useState<Stop[]>([]);
-  const [open, setOpen]         = useState(false);
-  const [focused, setFocused]   = useState(false);
+  const [query, setQuery]         = useState("");
+  const [results, setResults]     = useState<Stop[]>([]);
+  const [open, setOpen]           = useState(false);
+  const [focused, setFocused]     = useState(false);
   const [noResults, setNoResults] = useState(false);
-  const inputRef              = useRef<HTMLInputElement>(null);
-  const debounceRef           = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isLineBrowse = query.startsWith("/");
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Allow 2+ chars normally; for line-browse "/" + at least one code char = 2 chars
     if (query.length < 2) { setResults([]); setOpen(false); setNoResults(false); return; }
 
     debounceRef.current = setTimeout(async () => {
@@ -43,9 +73,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
     <div className="relative w-full">
       <div
         className={`flex items-center gap-3 bg-white rounded-full px-5 h-12 border transition-colors ${
-          focused
-            ? "border-[#003DA5] shadow-sm"
-            : "border-[#ECEDF0] shadow-sm"
+          focused ? "border-[#003DA5] shadow-sm" : "border-[#ECEDF0] shadow-sm"
         }`}
       >
         <Search
@@ -55,7 +83,11 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search for a station or stop…"
+          placeholder={
+            isLineBrowse
+              ? "Type a line — /G, /L, /B62…"
+              : "Search for a station or stop…"
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { setFocused(true); results.length > 0 && setOpen(true); }}
@@ -74,7 +106,20 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               <p className="text-[13px] font-semibold text-[#1A1D23]">No stops found</p>
               <p className="text-[12px] text-[#777D88]">Check for typos and try again</p>
             </div>
+          ) : isLineBrowse ? (
+            /* ── Line-browse results — flat list under a single header ── */
+            <div className="max-h-[min(320px,50dvh)] overflow-y-auto">
+              <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                {query.slice(1).toUpperCase()} · {results.length} stop{results.length !== 1 ? "s" : ""}
+              </p>
+              <div className="divide-y divide-[#ECEDF0]">
+                {results.map((stop) => (
+                  <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                ))}
+              </div>
+            </div>
           ) : (
+            /* ── Normal results — grouped by SUBWAY / BUS ── */
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
               {(["SUBWAY", "BUS"] as const).map((type) => {
                 const group = results.filter((s) => s.type === type);
@@ -84,29 +129,9 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
                     <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
                       {type}
                     </p>
-                    {group.map((stop) => {
-                      const already = selectedIds.has(stop.id);
-                      return (
-                        <button
-                          key={stop.id}
-                          onMouseDown={() => select(stop)}
-                          disabled={already}
-                          className={`w-full text-left px-4 py-2.5 flex flex-col gap-0.5 transition-colors ${
-                            already
-                              ? "opacity-40 cursor-default"
-                              : "hover:bg-[#F2F4F8] cursor-pointer"
-                          }`}
-                        >
-                          <span className="text-[14px] font-medium text-[#1A1D23]">
-                            {stop.name}
-                          </span>
-                          <span className="text-[12px] text-[#777D88]">
-                            {stop.lines.join(" · ")}
-                            {stop.direction && ` · ${stop.direction}`}
-                          </span>
-                        </button>
-                      );
-                    })}
+                    {group.map((stop) => (
+                      <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                    ))}
                   </div>
                 );
               })}
