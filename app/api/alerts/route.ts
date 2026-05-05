@@ -120,7 +120,17 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const deduped = alerts.filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i);
+    // Deduplicate: first by entity id, then by summary text.
+    // The MTA feed sometimes emits the same alert as two separate entities
+    // (different ids, identical text) — one matched by route_id, one by stop_id.
+    const seenIds      = new Set<string>();
+    const seenSummaries = new Set<string>();
+    const deduped = alerts.filter((a) => {
+      if (seenIds.has(a.id) || seenSummaries.has(a.summary)) return false;
+      seenIds.add(a.id);
+      seenSummaries.add(a.summary);
+      return true;
+    });
     return NextResponse.json(deduped);
   } catch (err) {
     console.error("alerts error:", err);
