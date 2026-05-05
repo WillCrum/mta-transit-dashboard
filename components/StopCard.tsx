@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { Map, ChevronRight, X, RefreshCw, AlertCircle, Clock } from "lucide-react";
+import { Map, ChevronRight, X, RefreshCw, AlertCircle, ClockAlert } from "lucide-react";
 import BusMap from "./BusMap";
 import LineBadge from "./LineBadge";
 import AlertBar from "./AlertBar";
@@ -184,7 +184,7 @@ export default function StopCard({ stop, onRemove, dragHandleProps }: Props) {
       ) : data.directions.length === 0 || data.directions.every((d) => d.arrivals.length === 0) ? (
         <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
           <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F2F4F8]">
-            <Clock size={18} className="text-[#777D88]" strokeWidth={1.75} />
+            <ClockAlert size={18} className="text-[#777D88]" strokeWidth={1.75} />
           </div>
           <p className="text-[13px] font-semibold text-[#1A1D23]">No arrivals scheduled</p>
           <p className="text-[12px] text-[#777D88]">Service may have ended for the night</p>
