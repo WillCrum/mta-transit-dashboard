@@ -14,7 +14,7 @@ const PLACEHOLDERS = [
 ];
 const DISPLAY_MS  = 5000;
 const FADE_OUT_MS = 500;
-const FADE_IN_MS  = 100;
+const FADE_IN_MS  = 250;
 
 function StopButton({
   stop,
