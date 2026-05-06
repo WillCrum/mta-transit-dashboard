@@ -15,11 +15,12 @@ const SUBWAY_LINE_CODES = new Set([
 ]);
 
 // Shuttle groups for /S line-browse
-const SHUTTLE_GROUPS = [
-  { code: "GS" },
-  { code: "FS" },
-  { code: "H"  },
-] as const;
+const SHUTTLE_GROUPS = [{ code: "GS" }, { code: "FS" }, { code: "H" }] as const;
+
+// Maximum distance (km) between consecutive polyline points.
+// Breaks long diagonal jumps caused by branches or data gaps while keeping
+// legitimate long segments like the A train's Jamaica Bay crossing (~6 km).
+const MAX_SEGMENT_KM = 7;
 
 interface SubwayStop {
   id: string;
@@ -34,13 +35,42 @@ interface Props {
   isLineBrowse: boolean;
   lineCode: string;
   allSubwayStops: SubwayStop[];
+  lineOrder: Record<string, string[]>;
   onSelect: (stop: Stop) => void;
   selectedIds: Set<string>;
 }
 
-// NYC center — Manhattan midpoint
 const NYC_CENTER: [number, number] = [40.728, -73.974];
 const NYC_DEFAULT_ZOOM = 12;
+
+/** Haversine distance in km between two [lat, lon] points. */
+function distKm(a: [number, number], b: [number, number]): number {
+  const R = 6371;
+  const dLat = (b[0] - a[0]) * (Math.PI / 180);
+  const dLon = (b[1] - a[1]) * (Math.PI / 180);
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a[0] * (Math.PI / 180)) *
+      Math.cos(b[0] * (Math.PI / 180)) *
+      Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+/** Split a point array into segments, breaking where consecutive points exceed MAX_SEGMENT_KM. */
+function buildSegments(pts: [number, number][]): [number, number][][] {
+  const segs: [number, number][][] = [];
+  let seg: [number, number][] = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (i === 0 || distKm(pts[i - 1], pts[i]) <= MAX_SEGMENT_KM) {
+      seg.push(pts[i]);
+    } else {
+      if (seg.length >= 2) segs.push(seg);
+      seg = [pts[i]];
+    }
+  }
+  if (seg.length >= 2) segs.push(seg);
+  return segs;
+}
 
 function stopColor(lines: string[]): string {
   return LINE_COLORS[lines[0]]?.bg ?? LINE_COLORS["BUS"].bg;
@@ -54,41 +84,58 @@ function FitResults({ results }: { results: Stop[] }) {
       .filter((s) => s.lat != null && s.lon != null)
       .map((s) => [s.lat!, s.lon!] as [number, number]);
     if (pts.length === 0) return;
-    if (pts.length === 1) {
-      map.setView(pts[0], 15);
-      return;
-    }
+    if (pts.length === 1) { map.setView(pts[0], 15); return; }
     map.fitBounds(L.latLngBounds(pts), { padding: [32, 32], maxZoom: 15, animate: true });
   }, [map, results]);
   return null;
 }
 
-/** Polyline(s) for subway line-browse only — buses have no meaningful stop sequence. */
-function LineBrowsePolyline({ results, lineCode }: { results: Stop[]; lineCode: string }) {
+/** Subway route polyline(s).
+ *  Filters to canonical-trip stops only (removes branch-only outliers),
+ *  then splits on any gap > MAX_SEGMENT_KM to prevent long diagonal jumps. */
+function LineBrowsePolyline({
+  results,
+  lineCode,
+  lineOrder,
+}: {
+  results: Stop[];
+  lineCode: string;
+  lineOrder: Record<string, string[]>;
+}) {
   if (!SUBWAY_LINE_CODES.has(lineCode)) return null;
+
+  const color = LINE_COLORS[lineCode]?.bg ?? LINE_COLORS["S"].bg;
+
+  function renderPolylines(stops: Stop[]) {
+    const pts = stops
+      .filter((s) => s.lat != null && s.lon != null)
+      .map((s) => [s.lat!, s.lon!] as [number, number]);
+    return buildSegments(pts).map((seg, i) => (
+      <Polyline key={i} positions={seg} color={color} weight={4} opacity={0.85} />
+    ));
+  }
 
   if (lineCode === "S") {
     return (
       <>
         {SHUTTLE_GROUPS.map(({ code }) => {
-          const group = results.filter((s) => s.lines.some((l) => l === code));
-          const pts = group
-            .filter((s) => s.lat != null && s.lon != null)
-            .map((s) => [s.lat!, s.lon!] as [number, number]);
-          if (pts.length < 2) return null;
-          return (
-            <Polyline key={code} positions={pts} color={LINE_COLORS["GS"]?.bg ?? "#808183"} weight={4} opacity={0.8} />
-          );
+          const canonical = new Set(lineOrder[code] ?? []);
+          const group = results.filter((s) => s.lines.some((l) => l === code) && canonical.has(s.id));
+          return <>{renderPolylines(group)}</>;
         })}
       </>
     );
   }
 
-  const pts = results
-    .filter((s) => s.lat != null && s.lon != null)
-    .map((s) => [s.lat!, s.lon!] as [number, number]);
-  if (pts.length < 2) return null;
-  return <Polyline positions={pts} color={LINE_COLORS[lineCode]?.bg ?? "#808183"} weight={4} opacity={0.8} />;
+  // Filter to stops that appear in the canonical trip for this line.
+  // This removes branch-only stops (e.g. Lefferts Blvd / Rockaway Park on the A)
+  // which would otherwise produce long diagonal jumps in the polyline.
+  const canonical = new Set(lineOrder[lineCode] ?? []);
+  const canonicalStops = canonical.size > 0
+    ? results.filter((s) => canonical.has(s.id))
+    : results; // fallback: use all results if no lineOrder data
+
+  return <>{renderPolylines(canonicalStops)}</>;
 }
 
 function StopTooltip({ name, lines }: { name: string; lines: string[] }) {
@@ -105,6 +152,7 @@ export default function MapSearchDropdown({
   isLineBrowse,
   lineCode,
   allSubwayStops,
+  lineOrder,
   onSelect,
   selectedIds,
 }: Props) {
@@ -112,8 +160,15 @@ export default function MapSearchDropdown({
   const hasCoordResults = results.some((s) => s.lat != null && s.lon != null);
   const showPolyline = isLineBrowse && hasCoordResults && SUBWAY_LINE_CODES.has(lineCode);
 
-  const idleMarkers  = !hasResults ? allSubwayStops : [];
+  const idleMarkers   = !hasResults ? allSubwayStops : [];
   const resultMarkers = hasResults ? results.filter((s) => s.lat != null && s.lon != null) : [];
+
+  // In line-browse mode all result stops should use the searched line's color,
+  // not lines[0] which may be a different line that shares the station.
+  const resultColor = (stop: Stop) =>
+    isLineBrowse && lineCode
+      ? (LINE_COLORS[lineCode]?.bg ?? stopColor(stop.lines))
+      : stopColor(stop.lines);
 
   return (
     <div className="relative" style={{ height: 360 }}>
@@ -160,17 +215,18 @@ export default function MapSearchDropdown({
           );
         })}
 
-        {/* Search results — filtered stops */}
+        {/* Search results — filtered/line-browse stops */}
         {resultMarkers.map((stop) => {
           const already = selectedIds.has(stop.id);
+          const color = resultColor(stop);
           return (
             <CircleMarker
               key={stop.id}
               center={[stop.lat!, stop.lon!]}
               radius={7}
               pathOptions={{
-                color:       already ? "#777D88" : stopColor(stop.lines),
-                fillColor:   already ? "#777D88" : stopColor(stop.lines),
+                color:       already ? "#777D88" : color,
+                fillColor:   already ? "#777D88" : color,
                 fillOpacity: already ? 0.4 : 0.9,
                 weight: 2,
                 opacity: 1,
@@ -186,11 +242,12 @@ export default function MapSearchDropdown({
           );
         })}
 
-        {showPolyline && <LineBrowsePolyline results={results} lineCode={lineCode} />}
+        {showPolyline && (
+          <LineBrowsePolyline results={results} lineCode={lineCode} lineOrder={lineOrder} />
+        )}
         {hasCoordResults && <FitResults results={results} />}
       </MapContainer>
 
-      {/* No-results overlay (keeps map visible underneath) */}
       {hasResults && !hasCoordResults && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/80 z-[1000]">
           <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F2F4F8]">

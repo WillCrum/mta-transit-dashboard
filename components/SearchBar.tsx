@@ -64,17 +64,12 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   const [phIndex, setPhIndex]     = useState(0);
   const [phVisible, setPhVisible] = useState(true);
 
-  const inputRef         = useRef<HTMLInputElement>(null);
-  const debounceRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks whether the user is interacting with the map dropdown so we
-  // don't close it when the input loses focus during panning/zooming.
-  const mapInteractingRef = useRef(false);
-
-  useEffect(() => {
-    const onUp = () => { mapInteractingRef.current = false; };
-    window.addEventListener("mouseup", onUp);
-    return () => window.removeEventListener("mouseup", onUp);
-  }, []);
+  const inputRef          = useRef<HTMLInputElement>(null);
+  const debounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the mouse is anywhere inside the dropdown.
+  // Used to prevent blur from closing the dropdown during map pan/zoom,
+  // which bypasses mousedown detection via Leaflet's internal stopPropagation.
+  const dropdownHoveredRef = useRef(false);
 
   // Cycle placeholder text: show → fade out → swap → fade in → repeat
   useEffect(() => {
@@ -157,7 +152,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               setFocused(true);
               if (searchMode === "map" || results.length > 0) setOpen(true);
             }}
-            onBlur={() => { setFocused(false); setTimeout(() => { if (!mapInteractingRef.current) setOpen(false); }, 150); }}
+            onBlur={() => { setFocused(false); setTimeout(() => { if (!dropdownHoveredRef.current) setOpen(false); }, 150); }}
             className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
           />
 
@@ -184,6 +179,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             type="button"
             onMouseDown={() => handleModeChange("text")}
             aria-label="Text search"
+            title="Text search"
             className={`p-1.5 rounded-md transition-colors ${
               searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
             }`}
@@ -194,6 +190,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             type="button"
             onMouseDown={() => handleModeChange("map")}
             aria-label="Map search"
+            title="Map search"
             className={`p-1.5 rounded-md transition-colors ${
               searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
             }`}
@@ -206,7 +203,8 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
       {open && (
         <div
           className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50"
-          onMouseDown={() => { mapInteractingRef.current = true; }}
+          onMouseEnter={() => { dropdownHoveredRef.current = true; }}
+          onMouseLeave={() => { dropdownHoveredRef.current = false; }}
         >
           {searchMode === "map" ? (
             <MapSearchDropdownWrapper

@@ -1,13 +1,15 @@
 "use client";
 import dynamic from "next/dynamic";
 import type { Stop } from "@/lib/types";
-import subwayStopsJson  from "@/lib/subway-stops.json";
-import subwayCoordsJson from "@/lib/subway-stop-coords.json";
-import subwayRoutesJson from "@/lib/subway-stop-routes.json";
+import subwayStopsJson     from "@/lib/subway-stops.json";
+import subwayCoordsJson    from "@/lib/subway-stop-coords.json";
+import subwayRoutesJson    from "@/lib/subway-stop-routes.json";
+import subwayLineOrderJson from "@/lib/subway-line-order.json";
 
-const stops  = subwayStopsJson  as Record<string, string>;
-const coords = subwayCoordsJson as Record<string, { lat: number; lon: number }>;
-const routes = subwayRoutesJson as Record<string, string[]>;
+const stops     = subwayStopsJson     as Record<string, string>;
+const coords    = subwayCoordsJson    as Record<string, { lat: number; lon: number }>;
+const routes    = subwayRoutesJson    as Record<string, string[]>;
+const lineOrder = subwayLineOrderJson as Record<string, string[]>;
 
 // Built once at module level — stable reference across renders
 const allSubwayStops = Object.entries(coords)
@@ -41,5 +43,11 @@ const MapSearchDropdownInner = dynamic(() => import("./MapSearchDropdown"), {
 });
 
 export default function MapSearchDropdownWrapper(props: Props) {
-  return <MapSearchDropdownInner {...props} allSubwayStops={allSubwayStops} />;
+  return (
+    <MapSearchDropdownInner
+      {...props}
+      allSubwayStops={allSubwayStops}
+      lineOrder={lineOrder}
+    />
+  );
 }
