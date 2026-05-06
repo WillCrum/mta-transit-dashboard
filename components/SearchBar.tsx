@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Search, SearchX, WholeWord, MapPinned } from "lucide-react";
+import { Search, SearchX, Type, Map } from "lucide-react";
 import type { Stop } from "@/lib/types";
 import MapSearchDropdownWrapper from "./MapSearchDropdownWrapper";
 
@@ -64,8 +64,17 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   const [phIndex, setPhIndex]     = useState(0);
   const [phVisible, setPhVisible] = useState(true);
 
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef         = useRef<HTMLInputElement>(null);
+  const debounceRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether the user is interacting with the map dropdown so we
+  // don't close it when the input loses focus during panning/zooming.
+  const mapInteractingRef = useRef(false);
+
+  useEffect(() => {
+    const onUp = () => { mapInteractingRef.current = false; };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+  }, []);
 
   // Cycle placeholder text: show → fade out → swap → fade in → repeat
   useEffect(() => {
@@ -148,7 +157,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               setFocused(true);
               if (searchMode === "map" || results.length > 0) setOpen(true);
             }}
-            onBlur={() => { setFocused(false); setTimeout(() => setOpen(false), 150); }}
+            onBlur={() => { setFocused(false); setTimeout(() => { if (!mapInteractingRef.current) setOpen(false); }, 150); }}
             className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
           />
 
@@ -179,7 +188,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
             }`}
           >
-            <WholeWord size={16} />
+            <Type size={16} />
           </button>
           <button
             type="button"
@@ -189,13 +198,16 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
               searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
             }`}
           >
-            <MapPinned size={16} />
+            <Map size={16} />
           </button>
         </div>
       </div>
 
       {open && (
-        <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50">
+        <div
+          className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50"
+          onMouseDown={() => { mapInteractingRef.current = true; }}
+        >
           {searchMode === "map" ? (
             <MapSearchDropdownWrapper
               results={results}

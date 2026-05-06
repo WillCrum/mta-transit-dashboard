@@ -7,11 +7,18 @@ import { SearchX } from "lucide-react";
 import type { Stop } from "@/lib/types";
 import { LINE_COLORS } from "@/lib/constants";
 
+// Only subway lines have meaningful stop-sequence data; skip polyline for buses
+const SUBWAY_LINE_CODES = new Set([
+  "1","2","3","4","5","6","6X","7","7X",
+  "A","B","C","D","E","F","G","J","L","M","N","Q","R","W","Z",
+  "GS","FS","H","S",
+]);
+
 // Shuttle groups for /S line-browse
 const SHUTTLE_GROUPS = [
-  { code: "GS", lines: ["GS"] },
-  { code: "FS", lines: ["FS"] },
-  { code: "H",  lines: ["H"] },
+  { code: "GS" },
+  { code: "FS" },
+  { code: "H"  },
 ] as const;
 
 interface SubwayStop {
@@ -31,11 +38,9 @@ interface Props {
   selectedIds: Set<string>;
 }
 
-// NYC bounding box
-const NYC_BOUNDS: L.LatLngBoundsLiteral = [
-  [40.4774, -74.2591],
-  [40.9176, -73.7004],
-];
+// NYC center — Manhattan midpoint
+const NYC_CENTER: [number, number] = [40.728, -73.974];
+const NYC_DEFAULT_ZOOM = 12;
 
 function stopColor(lines: string[]): string {
   return LINE_COLORS[lines[0]]?.bg ?? LINE_COLORS["BUS"].bg;
@@ -58,14 +63,10 @@ function FitResults({ results }: { results: Stop[] }) {
   return null;
 }
 
-/** Polyline(s) for line-browse mode. Handles /S shuttle (3 disconnected segments). */
-function LineBrowsePolyline({
-  results,
-  lineCode,
-}: {
-  results: Stop[];
-  lineCode: string;
-}) {
+/** Polyline(s) for subway line-browse only — buses have no meaningful stop sequence. */
+function LineBrowsePolyline({ results, lineCode }: { results: Stop[]; lineCode: string }) {
+  if (!SUBWAY_LINE_CODES.has(lineCode)) return null;
+
   if (lineCode === "S") {
     return (
       <>
@@ -75,9 +76,8 @@ function LineBrowsePolyline({
             .filter((s) => s.lat != null && s.lon != null)
             .map((s) => [s.lat!, s.lon!] as [number, number]);
           if (pts.length < 2) return null;
-          const color = LINE_COLORS["GS"]?.bg ?? "#808183";
           return (
-            <Polyline key={code} positions={pts} color={color} weight={4} opacity={0.8} />
+            <Polyline key={code} positions={pts} color={LINE_COLORS["GS"]?.bg ?? "#808183"} weight={4} opacity={0.8} />
           );
         })}
       </>
@@ -88,8 +88,16 @@ function LineBrowsePolyline({
     .filter((s) => s.lat != null && s.lon != null)
     .map((s) => [s.lat!, s.lon!] as [number, number]);
   if (pts.length < 2) return null;
-  const color = LINE_COLORS[lineCode]?.bg ?? "#808183";
-  return <Polyline positions={pts} color={color} weight={4} opacity={0.8} />;
+  return <Polyline positions={pts} color={LINE_COLORS[lineCode]?.bg ?? "#808183"} weight={4} opacity={0.8} />;
+}
+
+function StopTooltip({ name, lines }: { name: string; lines: string[] }) {
+  return (
+    <div style={{ lineHeight: 1.4 }}>
+      <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
+      <div style={{ fontSize: 11, color: "#777D88", marginTop: 2 }}>{lines.join(" · ")}</div>
+    </div>
+  );
 }
 
 export default function MapSearchDropdown({
@@ -102,17 +110,16 @@ export default function MapSearchDropdown({
 }: Props) {
   const hasResults = results.length > 0;
   const hasCoordResults = results.some((s) => s.lat != null && s.lon != null);
+  const showPolyline = isLineBrowse && hasCoordResults && SUBWAY_LINE_CODES.has(lineCode);
 
-  // Markers to render on the map
-  const idleMarkers = !hasResults ? allSubwayStops : [];
-  const resultMarkers = hasResults
-    ? results.filter((s) => s.lat != null && s.lon != null)
-    : [];
+  const idleMarkers  = !hasResults ? allSubwayStops : [];
+  const resultMarkers = hasResults ? results.filter((s) => s.lat != null && s.lon != null) : [];
 
   return (
     <div className="relative" style={{ height: 360 }}>
       <MapContainer
-        bounds={NYC_BOUNDS}
+        center={NYC_CENTER}
+        zoom={NYC_DEFAULT_ZOOM}
         style={{ height: "100%", width: "100%" }}
         zoomControl={true}
         attributionControl={false}
@@ -132,8 +139,8 @@ export default function MapSearchDropdown({
               center={[stop.lat, stop.lon]}
               radius={5}
               pathOptions={{
-                color: already ? "#777D88" : stopColor(stop.lines),
-                fillColor: already ? "#777D88" : stopColor(stop.lines),
+                color:       already ? "#777D88" : stopColor(stop.lines),
+                fillColor:   already ? "#777D88" : stopColor(stop.lines),
                 fillOpacity: already ? 0.4 : 0.85,
                 weight: 1.5,
                 opacity: 1,
@@ -141,20 +148,13 @@ export default function MapSearchDropdown({
               eventHandlers={{
                 mousedown: () => {
                   if (!already) {
-                    onSelect({
-                      id: stop.id,
-                      name: stop.name,
-                      type: "SUBWAY",
-                      lines: stop.lines,
-                      lat: stop.lat,
-                      lon: stop.lon,
-                    });
+                    onSelect({ id: stop.id, name: stop.name, type: "SUBWAY", lines: stop.lines, lat: stop.lat, lon: stop.lon });
                   }
                 },
               }}
             >
-              <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-                <span className="text-xs font-medium">{stop.name}</span>
+              <Tooltip direction="top" offset={[0, -6]} opacity={1}>
+                <StopTooltip name={stop.name} lines={stop.lines} />
               </Tooltip>
             </CircleMarker>
           );
@@ -169,35 +169,28 @@ export default function MapSearchDropdown({
               center={[stop.lat!, stop.lon!]}
               radius={7}
               pathOptions={{
-                color: already ? "#777D88" : stopColor(stop.lines),
-                fillColor: already ? "#777D88" : stopColor(stop.lines),
+                color:       already ? "#777D88" : stopColor(stop.lines),
+                fillColor:   already ? "#777D88" : stopColor(stop.lines),
                 fillOpacity: already ? 0.4 : 0.9,
                 weight: 2,
                 opacity: 1,
               }}
               eventHandlers={{
-                mousedown: () => {
-                  if (!already) onSelect(stop);
-                },
+                mousedown: () => { if (!already) onSelect(stop); },
               }}
             >
-              <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
-                <span className="text-xs font-medium">{stop.name}</span>
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <StopTooltip name={stop.name} lines={stop.lines} />
               </Tooltip>
             </CircleMarker>
           );
         })}
 
-        {/* Route polyline in line-browse mode */}
-        {isLineBrowse && hasCoordResults && (
-          <LineBrowsePolyline results={results} lineCode={lineCode} />
-        )}
-
-        {/* Auto-fit when results change */}
+        {showPolyline && <LineBrowsePolyline results={results} lineCode={lineCode} />}
         {hasCoordResults && <FitResults results={results} />}
       </MapContainer>
 
-      {/* No-results overlay */}
+      {/* No-results overlay (keeps map visible underneath) */}
       {hasResults && !hasCoordResults && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/80 z-[1000]">
           <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F2F4F8]">
