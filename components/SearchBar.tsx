@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Search, SearchX } from "lucide-react";
+import { Search, SearchX, WholeWord, MapPinned } from "lucide-react";
 import type { Stop } from "@/lib/types";
+import MapSearchDropdownWrapper from "./MapSearchDropdownWrapper";
 
 interface Props {
   onSelect: (stop: Stop) => void;
@@ -18,7 +19,7 @@ const SHUTTLE_GROUPS = [
 
 const PLACEHOLDERS = [
   "Search by station or bus stop name",
-  'Type “/” to search by train or bus line',
+  'Type "/" to search by train or bus line',
 ];
 const DISPLAY_MS  = 5000;
 const FADE_OUT_MS = 500;
@@ -52,11 +53,12 @@ function StopButton({
 }
 
 export default function SearchBar({ onSelect, selectedIds }: Props) {
-  const [query, setQuery]         = useState("");
-  const [results, setResults]     = useState<Stop[]>([]);
-  const [open, setOpen]           = useState(false);
-  const [focused, setFocused]     = useState(false);
-  const [noResults, setNoResults] = useState(false);
+  const [query, setQuery]           = useState("");
+  const [results, setResults]       = useState<Stop[]>([]);
+  const [open, setOpen]             = useState(false);
+  const [focused, setFocused]       = useState(false);
+  const [noResults, setNoResults]   = useState(false);
+  const [searchMode, setSearchMode] = useState<"text" | "map">("text");
 
   // Animated placeholder state
   const [phIndex, setPhIndex]     = useState(0);
@@ -72,11 +74,11 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
     function cycle() {
       tDisplay = setTimeout(() => {
-        setPhVisible(false);                         // start fade-out
+        setPhVisible(false);
         tSwap = setTimeout(() => {
           setPhIndex((i) => (i + 1) % PLACEHOLDERS.length);
-          setPhVisible(true);                        // start fade-in
-          cycle();                                   // schedule next cycle
+          setPhVisible(true);
+          cycle();
         }, FADE_OUT_MS);
       }, DISPLAY_MS);
     }
@@ -89,7 +91,13 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (query.length < 2) { setResults([]); setOpen(false); setNoResults(false); return; }
+    // In map mode, open even with no query so the idle map shows
+    if (query.length < 2) {
+      setResults([]);
+      setNoResults(false);
+      if (searchMode !== "map") setOpen(false);
+      return;
+    }
 
     debounceRef.current = setTimeout(async () => {
       const res  = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -98,7 +106,14 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
       setNoResults(data.length === 0);
       setOpen(true);
     }, 200);
-  }, [query]);
+  }, [query, searchMode]);
+
+  function handleModeChange(mode: "text" | "map") {
+    setSearchMode(mode);
+    if (mode === "map" && focused) setOpen(true);
+    // Focus the input so the user can type right away
+    inputRef.current?.focus();
+  }
 
   function select(stop: Stop) {
     if (!selectedIds.has(stop.id)) onSelect(stop);
@@ -112,13 +127,13 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   return (
     <div className="relative w-full">
       <div
-        className={`flex items-center gap-3 bg-white rounded-full px-5 h-12 border transition-colors ${
+        className={`flex items-center gap-3 bg-white rounded-full px-4 h-12 border transition-colors ${
           focused ? "border-[#003DA5] shadow-sm" : "border-[#ECEDF0] shadow-sm"
         }`}
       >
         <Search
           size={16}
-          className={`flex-shrink-0 transition-colors ${focused ? "text-[#003DA5]" : "text-[#777D88]"}`}
+          className={`flex-shrink-0 transition-colors ml-1 ${focused ? "text-[#003DA5]" : "text-[#777D88]"}`}
         />
 
         {/* Input + animated fake placeholder in the same flex cell */}
@@ -129,7 +144,10 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             placeholder=""
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => { setFocused(true); results.length > 0 && setOpen(true); }}
+            onFocus={() => {
+              setFocused(true);
+              if (searchMode === "map" || results.length > 0) setOpen(true);
+            }}
             onBlur={() => { setFocused(false); setTimeout(() => setOpen(false), 150); }}
             className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
           />
@@ -150,11 +168,43 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             </span>
           )}
         </div>
+
+        {/* Text / Map mode toggle */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 border-l border-[#ECEDF0] pl-2">
+          <button
+            type="button"
+            onMouseDown={() => handleModeChange("text")}
+            aria-label="Text search"
+            className={`p-1.5 rounded-md transition-colors ${
+              searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
+            }`}
+          >
+            <WholeWord size={16} />
+          </button>
+          <button
+            type="button"
+            onMouseDown={() => handleModeChange("map")}
+            aria-label="Map search"
+            className={`p-1.5 rounded-md transition-colors ${
+              searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
+            }`}
+          >
+            <MapPinned size={16} />
+          </button>
+        </div>
       </div>
 
       {open && (
         <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50">
-          {noResults ? (
+          {searchMode === "map" ? (
+            <MapSearchDropdownWrapper
+              results={results}
+              isLineBrowse={isLineBrowse}
+              lineCode={isLineBrowse ? query.slice(1).toUpperCase() : ""}
+              onSelect={select}
+              selectedIds={selectedIds}
+            />
+          ) : noResults ? (
             <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
               <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F2F4F8]">
                 <SearchX size={18} className="text-[#777D88]" strokeWidth={1.75} />

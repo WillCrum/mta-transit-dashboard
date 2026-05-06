@@ -3,11 +3,13 @@ import type { Stop } from "@/lib/types";
 import subwayStopsJson    from "@/lib/subway-stops.json";
 import subwayRoutesJson   from "@/lib/subway-stop-routes.json";
 import subwayLineOrderJson from "@/lib/subway-line-order.json";
+import subwayCoordsJson   from "@/lib/subway-stop-coords.json";
 import busStopsJson       from "@/lib/bus-stops.json";
 
 const subwayStops  = subwayStopsJson      as Record<string, string>;
 const subwayRoutes = subwayRoutesJson     as Record<string, string[]>;
 const lineOrder    = subwayLineOrderJson  as Record<string, string[]>;
+const subwayCoords = subwayCoordsJson     as Record<string, { lat: number; lon: number }>;
 const busStops     = busStopsJson         as Record<string, { name: string; routes: string[]; lat?: number; lon?: number; direction?: string }>;
 
 /** Sort stops by canonical trip order; unrecognised stops fall to the end. */
@@ -37,6 +39,7 @@ export async function GET(req: NextRequest) {
           name: (subwayStops as Record<string, string>)[id] ?? id,
           type: "SUBWAY",
           lines: lines as string[],
+          ...subwayCoords[id],
         });
       }
     }
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
     for (const [id, { name, routes, direction }] of Object.entries(busStops)) {
       if (busLineResults.length >= 150) break;
       if (routes.some((r) => r.toUpperCase() === lineCode)) {
-        busLineResults.push({ id, name, type: "BUS", lines: routes, direction });
+        busLineResults.push({ id, name, type: "BUS", lines: routes, direction, lat: busStops[id].lat, lon: busStops[id].lon });
       }
     }
     busLineResults.sort((a, b) => a.name.localeCompare(b.name));
@@ -68,7 +71,7 @@ export async function GET(req: NextRequest) {
       id.toLowerCase().includes(q) ||
       (subwayRoutes[id] ?? []).some((r) => r.toLowerCase().startsWith(q))
     ) {
-      results.push({ id, name, type: "SUBWAY", lines: subwayRoutes[id] ?? [] });
+      results.push({ id, name, type: "SUBWAY", lines: subwayRoutes[id] ?? [], ...subwayCoords[id] });
     }
   }
 
@@ -80,7 +83,7 @@ export async function GET(req: NextRequest) {
       name.toLowerCase().includes(q) ||
       routes.some((r) => r.toLowerCase().startsWith(q))
     ) {
-      busResults.push({ id, name, type: "BUS", lines: routes, direction });
+      busResults.push({ id, name, type: "BUS", lines: routes, direction, lat: busStops[id].lat, lon: busStops[id].lon });
     }
   }
 

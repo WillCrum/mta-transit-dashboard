@@ -186,8 +186,10 @@ http.get(GTFS_URL, (res) => {
     writeFileSync(path.join(__dir, "../lib/subway-stops.json"), JSON.stringify(stops, null, 2));
     writeFileSync(path.join(__dir, "../lib/subway-stop-routes.json"), JSON.stringify(routesJson, null, 2));
     writeFileSync(path.join(__dir, "../lib/subway-line-order.json"), JSON.stringify(lineOrder, null, 2));
+    writeFileSync(path.join(__dir, "../lib/subway-stop-coords.json"), JSON.stringify(stopCoords, null, 2));
     console.log(`Wrote ${Object.keys(stops).length} parent stations → lib/subway-stops.json`);
     console.log(`Wrote route mappings for ${Object.keys(routesJson).length} stops → lib/subway-stop-routes.json`);
     console.log(`Wrote stop order for ${Object.keys(lineOrder).length} routes → lib/subway-line-order.json`);
+    console.log(`Wrote coords for ${Object.keys(stopCoords).length} stops → lib/subway-stop-coords.json`);
   }).on("error", (e) => { console.error(e); process.exit(1); });
 }).on("error", (e) => { console.error(e); process.exit(1); });
