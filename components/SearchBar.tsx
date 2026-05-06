@@ -175,28 +175,36 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
         {/* Text / Map mode toggle */}
         <div className="flex items-center gap-0.5 flex-shrink-0 border-l border-[#ECEDF0] pl-2">
-          <button
-            type="button"
-            onMouseDown={() => handleModeChange("text")}
-            aria-label="Text search"
-            title="Text search"
-            className={`p-1.5 rounded-md transition-colors ${
-              searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
-            }`}
-          >
-            <Type size={16} />
-          </button>
-          <button
-            type="button"
-            onMouseDown={() => handleModeChange("map")}
-            aria-label="Map search"
-            title="Map search"
-            className={`p-1.5 rounded-md transition-colors ${
-              searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
-            }`}
-          >
-            <Map size={16} />
-          </button>
+          <div className="relative group/tip">
+            <button
+              type="button"
+              onMouseDown={() => handleModeChange("text")}
+              aria-label="Text search"
+              className={`p-1.5 rounded-md transition-colors ${
+                searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
+              }`}
+            >
+              <Type size={16} />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded text-[11px] font-medium text-white bg-[#1A1D23] whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 z-[9999]">
+              Text search
+            </span>
+          </div>
+          <div className="relative group/tip2">
+            <button
+              type="button"
+              onMouseDown={() => handleModeChange("map")}
+              aria-label="Map search"
+              className={`p-1.5 rounded-md transition-colors ${
+                searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
+              }`}
+            >
+              <Map size={16} />
+            </button>
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded text-[11px] font-medium text-white bg-[#1A1D23] whitespace-nowrap opacity-0 group-hover/tip2:opacity-100 transition-opacity duration-150 z-[9999]">
+              Map search
+            </span>
+          </div>
         </div>
       </div>
 
