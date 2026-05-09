@@ -66,10 +66,18 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
   const inputRef          = useRef<HTMLInputElement>(null);
   const debounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // True while the mouse is anywhere inside the dropdown.
-  // Used to prevent blur from closing the dropdown during map pan/zoom,
-  // which bypasses mousedown detection via Leaflet's internal stopPropagation.
+  // True while a pointer (mouse or finger) is inside the dropdown.
+  // Prevents blur from closing the dropdown during map pan/zoom on both
+  // desktop (mouseenter/leave) and mobile (touchstart/touchend).
   const dropdownHoveredRef = useRef(false);
+
+  useEffect(() => {
+    // Reset the flag when touch ends anywhere — mirrors the mouseLeave path
+    // for cases where touchend fires outside the dropdown element.
+    const onTouchEnd = () => { dropdownHoveredRef.current = false; };
+    window.addEventListener("touchend", onTouchEnd);
+    return () => window.removeEventListener("touchend", onTouchEnd);
+  }, []);
 
   // Cycle placeholder text: show → fade out → swap → fade in → repeat
   useEffect(() => {
@@ -213,6 +221,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50"
           onMouseEnter={() => { dropdownHoveredRef.current = true; }}
           onMouseLeave={() => { dropdownHoveredRef.current = false; }}
+          onTouchStart={() => { dropdownHoveredRef.current = true; }}
         >
           {searchMode === "map" ? (
             <MapSearchDropdownWrapper
