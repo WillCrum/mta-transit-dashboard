@@ -3,12 +3,14 @@ import { useState, useEffect } from "react";
 import { MapPinPlus } from "lucide-react";
 import {
   DndContext,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   closestCenter,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -74,9 +76,20 @@ export default function Home() {
   }
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // Desktop: start drag after moving 8px
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    // Mobile: long-press 250ms (allows scroll/tap to pass through),
+    // with 5px tolerance for slight finger movement during the hold
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  function handleDragStart(_event: DragStartEvent) {
+    // Single haptic pulse when drag activates — matches the long-press moment
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(40);
+    }
+  }
 
   const selectedIds = new Set(stops.map((s) => s.id));
 
@@ -115,6 +128,7 @@ export default function Home() {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={stops.map((s) => s.id)} strategy={rectSortingStrategy}>
