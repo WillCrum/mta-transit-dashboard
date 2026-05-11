@@ -103,7 +103,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
       <button
         type="button"
         onClick={() => { commitRename(); setOpen((v) => !v); }}
-        className={`flex items-center gap-2 bg-white rounded-full px-4 h-12 border shadow-sm transition-colors min-w-[160px] max-w-[220px] ${
+        className={`flex items-center gap-2 bg-white rounded-full px-4 h-12 border shadow-sm transition-colors w-full min-w-[160px] ${
           open ? "border-[#003DA5]" : "border-[#ECEDF0]"
         }`}
       >
@@ -122,12 +122,12 @@ export default function DashboardSelector({ library, onChange }: Props) {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute top-full mt-2 left-0 bg-white rounded-2xl shadow-lg overflow-hidden z-50 min-w-[220px]">
+        <div className="absolute top-full mt-2 left-0 right-0 bg-[#F2F4F8] rounded-2xl shadow-sm border border-[#ECEDF0] overflow-hidden z-50">
           {/* New dashboard */}
           <button
             type="button"
             onMouseDown={handleNew}
-            className="flex items-center gap-2.5 w-full px-4 py-3 text-[13px] font-medium text-[#003DA5] hover:bg-[#F2F4F8] transition-colors border-b border-[#ECEDF0]"
+            className="flex items-center gap-2.5 w-full px-4 py-3 text-[13px] font-medium text-[#003DA5] hover:bg-[#E6E8EE] transition-colors border-b border-[#DCDEE3]"
           >
             <Plus size={15} strokeWidth={2.5} />
             New dashboard
@@ -144,7 +144,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
                   key={dash.id}
                   onClick={() => handleSwitch(dash.id)}
                   className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
-                    isActive ? "bg-[#F2F4F8]" : "hover:bg-[#F2F4F8]"
+                    isActive ? "bg-[#E6E8EE]" : "hover:bg-[#E6E8EE]"
                   }`}
                 >
                   {/* Active checkmark */}
@@ -154,15 +154,30 @@ export default function DashboardSelector({ library, onChange }: Props) {
 
                   {/* Name or rename input */}
                   {isRenaming ? (
-                    <input
-                      ref={renameInputRef}
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={handleRenameKey}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 min-w-0 text-[13px] font-medium text-[#1A1D23] bg-white border border-[#003DA5] rounded px-1.5 py-0.5 outline-none"
-                    />
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value.slice(0, 30))}
+                        onBlur={commitRename}
+                        onKeyDown={handleRenameKey}
+                        onClick={(e) => e.stopPropagation()}
+                        maxLength={30}
+                        className={`w-full text-[13px] font-medium text-[#1A1D23] bg-white rounded px-1.5 py-0.5 outline-none border focus:bg-white ${
+                          renameValue.length >= 30 ? "border-red-500" : "border-[#003DA5]"
+                        }`}
+                      />
+                      {renameValue.length >= 20 && (
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-[10px] text-right leading-none ${
+                            renameValue.length >= 30 ? "text-red-500 font-semibold" : "text-[#777D88]"
+                          }`}
+                        >
+                          {renameValue.length}/30
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <span className={`flex-1 min-w-0 text-[13px] truncate ${
                       isActive ? "font-semibold text-[#1A1D23]" : "font-medium text-[#1A1D23]"
@@ -177,7 +192,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
                     <button
                       type="button"
                       onMouseDown={(e) => handleRenameClick(e, dash.id, dash.name)}
-                      className="p-1 rounded hover:bg-[#ECEDF0] text-[#777D88] hover:text-[#1A1D23] transition-colors"
+                      className="p-1 rounded hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23] transition-colors"
                       aria-label={`Rename ${dash.name}`}
                     >
                       <Pencil size={13} />
@@ -189,7 +204,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
                       className={`p-1 rounded transition-colors ${
                         onlyOne
                           ? "opacity-30 cursor-not-allowed text-[#777D88]"
-                          : "hover:bg-[#ECEDF0] text-[#777D88] hover:text-[#1A1D23]"
+                          : "hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23]"
                       }`}
                       aria-label={`Delete ${dash.name}`}
                     >
