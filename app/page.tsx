@@ -20,72 +20,57 @@ import {
 } from "@dnd-kit/sortable";
 import SearchBar from "@/components/SearchBar";
 import SortableStopCard from "@/components/SortableStopCard";
-import type { Stop } from "@/lib/types";
-
-const STORAGE_KEY = "mta-dashboard-stops";
-
-function loadStops(): Stop[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveStops(stops: Stop[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(stops));
-}
+import DashboardSelector from "@/components/DashboardSelector";
+import type { Stop, DashboardLibrary } from "@/lib/types";
+import {
+  loadLibrary,
+  saveLibrary,
+  updateStops,
+  defaultLibrary,
+} from "@/lib/dashboard-storage";
 
 export default function Home() {
-  const [stops, setStops]       = useState<Stop[]>([]);
+  const [library, setLibrary]   = useState<DashboardLibrary>(defaultLibrary);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setStops(loadStops());
+    setLibrary(loadLibrary());
     setHydrated(true);
   }, []);
 
+  // Derive the active dashboard's stops from library state
+  const active = library.dashboards.find((d) => d.id === library.activeId);
+  const stops  = active?.stops ?? [];
+
+  function mutate(next: DashboardLibrary) {
+    saveLibrary(next);
+    setLibrary(next);
+  }
+
   function addStop(stop: Stop) {
-    setStops((prev) => {
-      if (prev.some((s) => s.id === stop.id)) return prev;
-      const next = [...prev, stop];
-      saveStops(next);
-      return next;
-    });
+    if (stops.some((s) => s.id === stop.id)) return;
+    mutate(updateStops(library, [...stops, stop]));
   }
 
   function removeStop(id: string) {
-    setStops((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      saveStops(next);
-      return next;
-    });
+    mutate(updateStops(library, stops.filter((s) => s.id !== id)));
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setStops((prev) => {
-      const oldIndex = prev.findIndex((s) => s.id === active.id);
-      const newIndex = prev.findIndex((s) => s.id === over.id);
-      const next = arrayMove(prev, oldIndex, newIndex);
-      saveStops(next);
-      return next;
-    });
+    const oldIndex = stops.findIndex((s) => s.id === active.id);
+    const newIndex  = stops.findIndex((s) => s.id === over.id);
+    mutate(updateStops(library, arrayMove(stops, oldIndex, newIndex)));
   }
 
   const sensors = useSensors(
-    // Desktop: start drag after moving 8px
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    // Mobile: long-press 250ms (allows scroll/tap to pass through),
-    // with 5px tolerance for slight finger movement during the hold
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   function handleDragStart(_event: DragStartEvent) {
-    // Single haptic pulse when drag activates — matches the long-press moment
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(40);
     }
@@ -105,10 +90,13 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Search bar */}
+      {/* Dashboard selector + Search bar */}
       <div className="px-4 pt-4">
-        <div className="max-w-[690px] mx-auto">
-          <SearchBar onSelect={addStop} selectedIds={selectedIds} />
+        <div className="max-w-[900px] mx-auto flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+          <DashboardSelector library={library} onChange={setLibrary} />
+          <div className="flex-1 min-w-0">
+            <SearchBar onSelect={addStop} selectedIds={selectedIds} />
+          </div>
         </div>
       </div>
 

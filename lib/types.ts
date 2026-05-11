@@ -1,5 +1,16 @@
 export type StopType = "SUBWAY" | "BUS";
 
+export interface Dashboard {
+  id: string;
+  name: string;
+  stops: Stop[];
+}
+
+export interface DashboardLibrary {
+  dashboards: Dashboard[];
+  activeId: string;
+}
+
 export interface Stop {
   id: string;         // GTFS stop_id
   name: string;       // Display name
