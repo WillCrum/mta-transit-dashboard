@@ -98,7 +98,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
   }
 
   return (
-    <div ref={containerRef} className="relative flex-shrink-0">
+    <div ref={containerRef} className="relative w-full md:w-[220px] flex-shrink-0">
       {/* Trigger pill — matches search bar height and style */}
       <button
         type="button"
