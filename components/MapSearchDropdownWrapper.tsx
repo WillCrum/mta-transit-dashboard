@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import type { Stop } from "@/lib/types";
+import type { Stop, PlaceResult } from "@/lib/types";
 import subwayStopsJson     from "@/lib/subway-stops.json";
 import subwayCoordsJson    from "@/lib/subway-stop-coords.json";
 import subwayRoutesJson    from "@/lib/subway-stop-routes.json";
@@ -28,6 +28,7 @@ interface Props {
   lineCode: string;
   onSelect: (stop: Stop) => void;
   selectedIds: Set<string>;
+  pinLocation?: PlaceResult | null;
 }
 
 const MapSearchDropdownInner = dynamic(() => import("./MapSearchDropdown"), {

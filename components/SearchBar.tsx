@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Search, SearchX, Type, Map } from "lucide-react";
-import type { Stop } from "@/lib/types";
+import { Search, SearchX, Type, Map, MapPin, X } from "lucide-react";
+import type { Stop, PlaceResult } from "@/lib/types";
 import MapSearchDropdownWrapper from "./MapSearchDropdownWrapper";
 
 interface Props {
@@ -59,6 +59,8 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   const [focused, setFocused]       = useState(false);
   const [noResults, setNoResults]   = useState(false);
   const [searchMode, setSearchMode] = useState<"text" | "map">("text");
+  const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
+  const [pinLocation, setPinLocation]   = useState<PlaceResult | null>(null);
 
   // Animated placeholder state
   const [phIndex, setPhIndex]     = useState(0);
@@ -103,6 +105,10 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    // Typing always clears the pin so the user can start a new search
+    setPinLocation(null);
+    setPlaceResults([]);
+
     // In map mode, open even with no query so the idle map shows
     if (query.length < 2) {
       setResults([]);
@@ -111,11 +117,18 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
       return;
     }
 
+    const fetchPlaces = searchMode === "map" && !query.startsWith("/");
+
     debounceRef.current = setTimeout(async () => {
-      const res  = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      const data = await res.json();
-      setResults(data);
-      setNoResults(data.length === 0);
+      const [transitData, placesData] = await Promise.all([
+        fetch(`/api/search?q=${encodeURIComponent(query)}`).then((r) => r.json()),
+        fetchPlaces
+          ? fetch(`/api/geocode?q=${encodeURIComponent(query)}`).then((r) => r.json())
+          : Promise.resolve([]),
+      ]);
+      setResults(transitData);
+      setPlaceResults(placesData);
+      setNoResults(transitData.length === 0 && placesData.length === 0);
       setOpen(true);
     }, 200);
   }, [query, searchMode]);
@@ -131,9 +144,30 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
     if (!selectedIds.has(stop.id)) onSelect(stop);
     setQuery("");
     setResults([]);
-    setOpen(false);
+    setPlaceResults([]);
     setNoResults(false);
-    inputRef.current?.blur();
+    // In pin mode keep the map open so the user can add more nearby stops
+    if (pinLocation) {
+      setOpen(true);
+    } else {
+      setOpen(false);
+      inputRef.current?.blur();
+    }
+  }
+
+  function selectPlace(place: PlaceResult) {
+    setPinLocation(place);
+    setPlaceResults([]);
+    setQuery("");
+    setResults([]);
+    setNoResults(false);
+    setOpen(true);
+    inputRef.current?.focus();
+  }
+
+  function clearPin() {
+    setPinLocation(null);
+    setPlaceResults([]);
   }
 
   return (
@@ -158,7 +192,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => {
               setFocused(true);
-              if (searchMode === "map" || results.length > 0) setOpen(true);
+              if (searchMode === "map" || results.length > 0 || pinLocation) setOpen(true);
             }}
             onBlur={() => { setFocused(false); setTimeout(() => { if (!dropdownHoveredRef.current) setOpen(false); }, 150); }}
             className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
@@ -224,13 +258,52 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           onTouchStart={() => { dropdownHoveredRef.current = true; }}
         >
           {searchMode === "map" ? (
-            <MapSearchDropdownWrapper
-              results={results}
-              isLineBrowse={isLineBrowse}
-              lineCode={isLineBrowse ? query.slice(1).toUpperCase() : ""}
-              onSelect={select}
-              selectedIds={selectedIds}
-            />
+            <>
+              {/* Pin location banner */}
+              {pinLocation && (
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#ECEDF0] bg-[#EEF2FA]">
+                  <MapPin size={14} className="flex-shrink-0 text-[#003DA5]" />
+                  <span className="flex-1 text-[13px] font-medium text-[#1A1D23] truncate">{pinLocation.label}</span>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); clearPin(); }}
+                    className="flex-shrink-0 p-0.5 rounded hover:bg-[#D8E2F5] text-[#777D88] hover:text-[#1A1D23] transition-colors"
+                    aria-label="Clear location"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
+              {/* Place autocomplete suggestions — shown above the map */}
+              {placeResults.length > 0 && (
+                <div className="border-b border-[#ECEDF0]">
+                  <p className="px-4 pt-2.5 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                    Places
+                  </p>
+                  {placeResults.map((place, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); selectPlace(place); }}
+                      className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-[#F2F4F8] transition-colors"
+                    >
+                      <MapPin size={14} className="flex-shrink-0 text-[#777D88]" />
+                      <span className="text-[13px] text-[#1A1D23] truncate">{place.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <MapSearchDropdownWrapper
+                results={results}
+                isLineBrowse={isLineBrowse}
+                lineCode={isLineBrowse ? query.slice(1).toUpperCase() : ""}
+                onSelect={select}
+                selectedIds={selectedIds}
+                pinLocation={pinLocation}
+              />
+            </>
           ) : noResults ? (
             <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
               <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#F2F4F8]">

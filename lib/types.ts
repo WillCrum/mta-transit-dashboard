@@ -38,6 +38,12 @@ export interface Alert {
   type: "SERVICE" | "ELEVATOR";
 }
 
+export interface PlaceResult {
+  label: string;
+  lat: number;
+  lon: number;
+}
+
 export interface StopData {
   stop: Stop;
   alerts: Alert[];

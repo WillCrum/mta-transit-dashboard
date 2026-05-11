@@ -2,9 +2,9 @@
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, Marker, useMap } from "react-leaflet";
 import { SearchX } from "lucide-react";
-import type { Stop } from "@/lib/types";
+import type { Stop, PlaceResult } from "@/lib/types";
 import { LINE_COLORS } from "@/lib/constants";
 
 // Only subway lines have meaningful stop-sequence data; skip polyline for buses
@@ -30,6 +30,8 @@ interface SubwayStop {
   lines: string[];
 }
 
+const RADIUS_KM = 1.60934; // 1 mile
+
 interface Props {
   results: Stop[];
   isLineBrowse: boolean;
@@ -38,6 +40,7 @@ interface Props {
   lineOrder: Record<string, string[]>;
   onSelect: (stop: Stop) => void;
   selectedIds: Set<string>;
+  pinLocation?: PlaceResult | null;
 }
 
 const NYC_CENTER: [number, number] = [40.728, -73.974];
@@ -88,6 +91,38 @@ function FitResults({ results }: { results: Stop[] }) {
     map.fitBounds(L.latLngBounds(pts), { padding: [32, 32], maxZoom: 15, animate: true });
   }, [map, results]);
   return null;
+}
+
+/** Pans/zooms to fit a pin and its nearby stops. */
+function FitPin({ pin, nearby }: { pin: PlaceResult; nearby: SubwayStop[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts: [number, number][] = [
+      [pin.lat, pin.lon],
+      ...nearby.map((s) => [s.lat, s.lon] as [number, number]),
+    ];
+    if (pts.length === 1) { map.setView(pts[0], 15); return; }
+    map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 16, animate: true });
+  }, [map, pin, nearby]);
+  return null;
+}
+
+/** Custom drop-pin icon for geocoded place locations. */
+function makePinIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width: 20px; height: 20px;
+      background: #003DA5;
+      border: 2.5px solid white;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 20],
+    tooltipAnchor: [6, -18],
+  });
 }
 
 /** Subway route polyline(s).
@@ -155,13 +190,24 @@ export default function MapSearchDropdown({
   lineOrder,
   onSelect,
   selectedIds,
+  pinLocation,
 }: Props) {
+  // Pin mode: filter all subway stops to within 1 mile of pin
+  const nearbyStops = pinLocation
+    ? allSubwayStops.filter(
+        (s) => distKm([pinLocation.lat, pinLocation.lon], [s.lat, s.lon]) <= RADIUS_KM
+      )
+    : [];
+
+  const pinMode = !!pinLocation;
+
   const hasResults = results.length > 0;
   const hasCoordResults = results.some((s) => s.lat != null && s.lon != null);
-  const showPolyline = isLineBrowse && hasCoordResults && SUBWAY_LINE_CODES.has(lineCode);
+  const showPolyline = !pinMode && isLineBrowse && hasCoordResults && SUBWAY_LINE_CODES.has(lineCode);
 
-  const idleMarkers   = !hasResults ? allSubwayStops : [];
-  const resultMarkers = hasResults ? results.filter((s) => s.lat != null && s.lon != null) : [];
+  // In pin mode: show nearby stops. In normal mode: idle = all stops, results = filtered.
+  const idleMarkers   = pinMode ? [] : (!hasResults ? allSubwayStops : []);
+  const resultMarkers = pinMode ? [] : (hasResults ? results.filter((s) => s.lat != null && s.lon != null) : []);
 
   // In line-browse mode all result stops should use the searched line's color,
   // not lines[0] which may be a different line that shares the station.
@@ -242,10 +288,53 @@ export default function MapSearchDropdown({
           );
         })}
 
+        {/* Pin mode — drop-pin marker + nearby transit stops */}
+        {pinMode && pinLocation && (
+          <>
+            <Marker
+              position={[pinLocation.lat, pinLocation.lon]}
+              icon={makePinIcon()}
+            >
+              <Tooltip direction="top" offset={[0, -22]} opacity={1} permanent={false}>
+                <div style={{ fontWeight: 600, fontSize: 13, maxWidth: 200 }}>{pinLocation.label}</div>
+              </Tooltip>
+            </Marker>
+            {nearbyStops.map((stop) => {
+              const already = selectedIds.has(stop.id);
+              return (
+                <CircleMarker
+                  key={stop.id}
+                  center={[stop.lat, stop.lon]}
+                  radius={7}
+                  pathOptions={{
+                    color:       already ? "#777D88" : stopColor(stop.lines),
+                    fillColor:   already ? "#777D88" : stopColor(stop.lines),
+                    fillOpacity: already ? 0.4 : 0.9,
+                    weight: 2,
+                    opacity: 1,
+                  }}
+                  eventHandlers={{
+                    mousedown: () => {
+                      if (!already) {
+                        onSelect({ id: stop.id, name: stop.name, type: "SUBWAY", lines: stop.lines, lat: stop.lat, lon: stop.lon });
+                      }
+                    },
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                    <StopTooltip name={stop.name} lines={stop.lines} />
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })}
+            <FitPin pin={pinLocation} nearby={nearbyStops} />
+          </>
+        )}
+
         {showPolyline && (
           <LineBrowsePolyline results={results} lineCode={lineCode} lineOrder={lineOrder} />
         )}
-        {hasCoordResults && <FitResults results={results} />}
+        {!pinMode && hasCoordResults && <FitResults results={results} />}
       </MapContainer>
 
       {hasResults && !hasCoordResults && (
