@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { LayoutDashboard, ChevronDown, Plus, Check, Pencil, X } from "lucide-react";
+import { LayoutDashboard, ChevronRight, Plus, Check, Pencil, X } from "lucide-react";
 import type { DashboardLibrary } from "@/lib/types";
 import {
   createDashboard,
@@ -103,20 +103,18 @@ export default function DashboardSelector({ library, onChange }: Props) {
       <button
         type="button"
         onClick={() => { commitRename(); setOpen((v) => !v); }}
-        className={`flex items-center gap-2 bg-white rounded-full px-4 h-12 border shadow-sm transition-colors w-full min-w-[160px] ${
-          open ? "border-[#003DA5]" : "border-[#ECEDF0]"
-        }`}
+        className="flex items-center gap-2 bg-[#F2F4F8] rounded-full px-4 h-12 shadow-md transition-colors w-full min-w-[160px]"
       >
         <LayoutDashboard
           size={16}
-          className={`flex-shrink-0 transition-colors ${open ? "text-[#003DA5]" : "text-[#777D88]"}`}
+          className="flex-shrink-0 text-[#777D88]"
         />
         <span className="flex-1 text-left text-[14px] font-semibold text-[#1A1D23] truncate">
           {active?.name ?? "Dashboard"}
         </span>
-        <ChevronDown
+        <ChevronRight
           size={14}
-          className={`flex-shrink-0 text-[#777D88] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className="flex-shrink-0 text-[#777D88]"
         />
       </button>
 
