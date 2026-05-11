@@ -192,11 +192,14 @@ function LineBrowsePolyline({
   return <>{renderPolylines(canonicalStops)}</>;
 }
 
-function StopTooltip({ name, lines }: { name: string; lines: string[] }) {
+function StopTooltip({ name, lines, direction }: { name: string; lines: string[]; direction?: string }) {
   return (
     <div style={{ lineHeight: 1.4 }}>
       <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
-      <div style={{ fontSize: 11, color: "#777D88", marginTop: 2 }}>{lines.join(" · ")}</div>
+      <div style={{ fontSize: 11, color: "#777D88", marginTop: 2 }}>
+        {lines.join(" · ")}
+        {direction && <span> · {direction}</span>}
+      </div>
     </div>
   );
 }
@@ -369,7 +372,7 @@ export default function MapSearchDropdown({
                   }}
                 >
                   <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-                    <StopTooltip name={stop.name} lines={stop.lines} />
+                    <StopTooltip name={stop.name} lines={stop.lines} direction={stop.direction} />
                   </Tooltip>
                 </CircleMarker>
               );
