@@ -113,7 +113,10 @@ function FitPin({
     ];
     if (pts.length === 1) { map.setView(pts[0], 15); return; }
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 16, animate: true });
-  }, [map, pin, nearby, nearbyBus]);
+  // Only re-fit when the pin location changes — not when async nearby data
+  // arrives, so the user's manual zoom adjustments are respected.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
   return null;
 }
 

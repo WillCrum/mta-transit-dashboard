@@ -38,22 +38,25 @@ export async function GET(req: NextRequest) {
     if (dist <= RADIUS_KM) nearby.push({ id, stop, dist });
   }
 
-  // Per-route: keep only the closest stop for each route
-  const closestByRoute = new Map<string, { id: string; stop: BusStop; dist: number }>();
+  // Per route+direction: keep only the closest stop for each combination.
+  // This ensures both directions of a route are represented (e.g. northbound
+  // and southbound B63 stops near the pin each appear).
+  const closestByRouteDir = new Map<string, { id: string; stop: BusStop; dist: number }>();
   for (const entry of nearby) {
     for (const route of entry.stop.routes) {
-      const existing = closestByRoute.get(route);
+      const key = `${route}||${entry.stop.direction}`;
+      const existing = closestByRouteDir.get(key);
       if (!existing || entry.dist < existing.dist) {
-        closestByRoute.set(route, entry);
+        closestByRouteDir.set(key, entry);
       }
     }
   }
 
-  // Deduplicate: a stop may be the closest for several routes — emit it once
-  // but with all its routes listed.
+  // Deduplicate: a stop may be the closest for several route+direction combos
+  // (e.g. a stop serving B63 and B67 in the same direction) — emit it once.
   const seenIds = new Set<string>();
   const results = [];
-  for (const entry of closestByRoute.values()) {
+  for (const entry of closestByRouteDir.values()) {
     if (seenIds.has(entry.id)) continue;
     seenIds.add(entry.id);
     results.push({
