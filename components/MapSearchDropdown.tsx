@@ -41,6 +41,7 @@ interface Props {
   onSelect: (stop: Stop) => void;
   selectedIds: Set<string>;
   pinLocation?: PlaceResult | null;
+  nearbyBusStops?: Stop[];
 }
 
 const NYC_CENTER: [number, number] = [40.728, -73.974];
@@ -94,16 +95,25 @@ function FitResults({ results }: { results: Stop[] }) {
 }
 
 /** Pans/zooms to fit a pin and its nearby stops. */
-function FitPin({ pin, nearby }: { pin: PlaceResult; nearby: SubwayStop[] }) {
+function FitPin({
+  pin,
+  nearby,
+  nearbyBus,
+}: {
+  pin: PlaceResult;
+  nearby: SubwayStop[];
+  nearbyBus: Stop[];
+}) {
   const map = useMap();
   useEffect(() => {
     const pts: [number, number][] = [
       [pin.lat, pin.lon],
       ...nearby.map((s) => [s.lat, s.lon] as [number, number]),
+      ...nearbyBus.filter((s) => s.lat != null && s.lon != null).map((s) => [s.lat!, s.lon!] as [number, number]),
     ];
     if (pts.length === 1) { map.setView(pts[0], 15); return; }
     map.fitBounds(L.latLngBounds(pts), { padding: [40, 40], maxZoom: 16, animate: true });
-  }, [map, pin, nearby]);
+  }, [map, pin, nearby, nearbyBus]);
   return null;
 }
 
@@ -197,6 +207,7 @@ export default function MapSearchDropdown({
   onSelect,
   selectedIds,
   pinLocation,
+  nearbyBusStops = [],
 }: Props) {
   // Pin mode: filter all subway stops to within 1 mile of pin
   const nearbyStops = pinLocation
@@ -334,7 +345,34 @@ export default function MapSearchDropdown({
                 </CircleMarker>
               );
             })}
-            <FitPin pin={pinLocation} nearby={nearbyStops} />
+            {/* Nearby bus stops — closest per route */}
+            {nearbyBusStops.map((stop) => {
+              const already = selectedIds.has(stop.id);
+              const color = LINE_COLORS["BUS"].bg;
+              return (
+                <CircleMarker
+                  key={stop.id}
+                  center={[stop.lat!, stop.lon!]}
+                  radius={6}
+                  pathOptions={{
+                    color:       already ? "#777D88" : color,
+                    fillColor:   already ? "#777D88" : color,
+                    fillOpacity: already ? 0.4 : 0.9,
+                    weight: 2,
+                    opacity: 1,
+                  }}
+                  eventHandlers={{
+                    mousedown: () => { if (!already) onSelect(stop); },
+                  }}
+                >
+                  <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                    <StopTooltip name={stop.name} lines={stop.lines} />
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })}
+
+            <FitPin pin={pinLocation} nearby={nearbyStops} nearbyBus={nearbyBusStops} />
           </>
         )}
 

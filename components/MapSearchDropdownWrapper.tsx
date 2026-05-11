@@ -1,5 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
 import type { Stop, PlaceResult } from "@/lib/types";
 import subwayStopsJson     from "@/lib/subway-stops.json";
 import subwayCoordsJson    from "@/lib/subway-stop-coords.json";
@@ -44,11 +45,26 @@ const MapSearchDropdownInner = dynamic(() => import("./MapSearchDropdown"), {
 });
 
 export default function MapSearchDropdownWrapper(props: Props) {
+  const [nearbyBusStops, setNearbyBusStops] = useState<Stop[]>([]);
+
+  useEffect(() => {
+    if (!props.pinLocation) {
+      setNearbyBusStops([]);
+      return;
+    }
+    const { lat, lon } = props.pinLocation;
+    fetch(`/api/nearby-bus-stops?lat=${lat}&lon=${lon}`)
+      .then((r) => r.json())
+      .then(setNearbyBusStops)
+      .catch(() => setNearbyBusStops([]));
+  }, [props.pinLocation]);
+
   return (
     <MapSearchDropdownInner
       {...props}
       allSubwayStops={allSubwayStops}
       lineOrder={lineOrder}
+      nearbyBusStops={nearbyBusStops}
     />
   );
 }
