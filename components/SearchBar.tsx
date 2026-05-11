@@ -316,7 +316,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
                 <SearchX size={18} className="text-[#777D88]" strokeWidth={1.75} />
               </div>
               <p className="text-[13px] font-semibold text-[#1A1D23]">No stops found</p>
-              <p className="text-[12px] text-[#777D88]">Check for typos and try again</p>
+              <p className="text-[12px] text-[#777D88]">Switch to 'map' mode to search by address or business name.</p>
             </div>
           ) : isLineBrowse ? (
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
