@@ -105,9 +105,11 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    // Typing always clears the pin so the user can start a new search
-    setPinLocation(null);
+    // Always clear stale place suggestions when the query changes
     setPlaceResults([]);
+    // NOTE: do NOT clear pinLocation here — selectPlace() calls setQuery("") to
+    // reset the input, and clearing pin in this effect would immediately undo it.
+    // Pin is cleared only when the user manually types (see onChange below).
 
     // In map mode, open even with no query so the idle map shows
     if (query.length < 2) {
@@ -189,7 +191,11 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             type="text"
             placeholder=""
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              // User typed something new — clear any active pin
+              if (pinLocation) setPinLocation(null);
+              setQuery(e.target.value);
+            }}
             onFocus={() => {
               setFocused(true);
               if (searchMode === "map" || results.length > 0 || pinLocation) setOpen(true);

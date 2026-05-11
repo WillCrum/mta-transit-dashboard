@@ -107,23 +107,29 @@ function FitPin({ pin, nearby }: { pin: PlaceResult; nearby: SubwayStop[] }) {
   return null;
 }
 
-/** Custom drop-pin icon for geocoded place locations. */
-function makePinIcon() {
-  return L.divIcon({
-    className: "",
-    html: `<div style="
-      width: 20px; height: 20px;
-      background: #003DA5;
-      border: 2.5px solid white;
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-    "></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 20],
-    tooltipAnchor: [6, -18],
-  });
-}
+/** Custom drop-pin icon — circle head + vertical stem, anchored at stem tip. */
+const PIN_ICON = L.divIcon({
+  className: "",
+  html: `<div style="position:relative;width:22px;height:32px;">
+    <div style="
+      position:absolute;top:0;left:1px;
+      width:20px;height:20px;
+      background:#003DA5;
+      border:2.5px solid white;
+      border-radius:50%;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
+    "></div>
+    <div style="
+      position:absolute;bottom:0;left:10px;
+      width:2px;height:13px;
+      background:#003DA5;
+      border-radius:0 0 2px 2px;
+    "></div>
+  </div>`,
+  iconSize: [22, 32],
+  iconAnchor: [11, 32],
+  tooltipAnchor: [0, -34],
+});
 
 /** Subway route polyline(s).
  *  Filters to canonical-trip stops only (removes branch-only outliers),
@@ -293,7 +299,8 @@ export default function MapSearchDropdown({
           <>
             <Marker
               position={[pinLocation.lat, pinLocation.lon]}
-              icon={makePinIcon()}
+              icon={PIN_ICON}
+              zIndexOffset={1000}
             >
               <Tooltip direction="top" offset={[0, -22]} opacity={1} permanent={false}>
                 <div style={{ fontWeight: 600, fontSize: 13, maxWidth: 200 }}>{pinLocation.label}</div>
