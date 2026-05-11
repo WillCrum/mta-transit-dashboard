@@ -104,7 +104,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
         type="button"
         onClick={() => { commitRename(); setOpen((v) => !v); }}
         className={`flex items-center gap-2 bg-[#F2F4F8] rounded-full px-4 h-12 border transition-colors w-full min-w-[160px] ${
-          open ? "border-[#003DA5]" : "border-[#777D88]"
+          open ? "border-[#003DA5]" : "border-[#D2D5DA]"
         }`}
       >
         <LayoutDashboard
