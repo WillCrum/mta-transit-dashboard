@@ -7,15 +7,14 @@ import {
   renameDashboard,
   deleteDashboard,
   setActiveId,
-  saveLibrary,
 } from "@/lib/dashboard-storage";
 
 interface Props {
   library: DashboardLibrary;
-  onChange: (lib: DashboardLibrary) => void;
+  onMutate: (lib: DashboardLibrary) => Promise<void>;
 }
 
-export default function DashboardSelector({ library, onChange }: Props) {
+export default function DashboardSelector({ library, onMutate }: Props) {
   const [open, setOpen]           = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -49,8 +48,7 @@ export default function DashboardSelector({ library, onChange }: Props) {
   }, [renamingId]);
 
   function update(lib: DashboardLibrary) {
-    saveLibrary(lib);
-    onChange(lib);
+    void onMutate(lib);
   }
 
   function startRename(id: string, currentName: string) {
