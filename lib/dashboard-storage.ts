@@ -64,6 +64,10 @@ export function setActiveId(lib: DashboardLibrary, activeId: string): DashboardL
   return { ...lib, activeId };
 }
 
+export function reorderDashboards(lib: DashboardLibrary, dashboards: Dashboard[]): DashboardLibrary {
+  return { ...lib, dashboards };
+}
+
 export function updateStops(lib: DashboardLibrary, stops: Stop[]): DashboardLibrary {
   return {
     ...lib,

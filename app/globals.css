@@ -14,3 +14,12 @@ body {
   font-family: Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Prevent iOS Safari from auto-zooming when an input is focused.
+   Safari zooms any input with font-size < 16px. This rule applies
+   only on iOS (via -webkit-touch-callout) and has no effect on desktop. */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: max(16px, 1em);
+  }
+}

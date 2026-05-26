@@ -1,7 +1,7 @@
 "use client";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect } from "react";
+import { useEffect, Fragment } from "react";
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, Marker, useMap } from "react-leaflet";
 import { SearchX } from "lucide-react";
 import type { Stop, PlaceResult } from "@/lib/types";
@@ -175,7 +175,7 @@ function LineBrowsePolyline({
         {SHUTTLE_GROUPS.map(({ code }) => {
           const canonical = new Set(lineOrder[code] ?? []);
           const group = results.filter((s) => s.lines.some((l) => l === code) && canonical.has(s.id));
-          return <>{renderPolylines(group)}</>;
+          return <Fragment key={code}>{renderPolylines(group)}</Fragment>;
         })}
       </>
     );

@@ -66,8 +66,9 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   const [phIndex, setPhIndex]     = useState(0);
   const [phVisible, setPhVisible] = useState(true);
 
-  const inputRef          = useRef<HTMLInputElement>(null);
-  const debounceRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef           = useRef<HTMLInputElement>(null);
+  const containerRef       = useRef<HTMLDivElement>(null);
+  const debounceRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True while a pointer (mouse or finger) is inside the dropdown.
   // Prevents blur from closing the dropdown during map pan/zoom on both
   // desktop (mouseenter/leave) and mobile (touchstart/touchend).
@@ -80,6 +81,18 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
     window.addEventListener("touchend", onTouchEnd);
     return () => window.removeEventListener("touchend", onTouchEnd);
   }, []);
+
+  // Close dropdown on outside click/tap (handles map mode where blur doesn't fire).
+  useEffect(() => {
+    if (!open) return;
+    function onOutsideMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onOutsideMouseDown);
+    return () => document.removeEventListener("mousedown", onOutsideMouseDown);
+  }, [open]);
 
   // Cycle placeholder text: show → fade out → swap → fade in → repeat
   useEffect(() => {
@@ -137,8 +150,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
 
   function handleModeChange(mode: "text" | "map") {
     setSearchMode(mode);
-    if (mode === "map" && focused) setOpen(true);
-    // Focus the input so the user can type right away
+    if (mode === "map") setOpen(true);
     inputRef.current?.focus();
   }
 
@@ -173,7 +185,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   }
 
   return (
-    <div className="relative w-full">
+    <div ref={containerRef} className="relative w-full">
       <div
         className={`flex items-center gap-3 bg-white rounded-full px-4 h-12 border transition-colors ${
           focused ? "border-[#003DA5] shadow-sm" : "border-[#ECEDF0] shadow-sm"
@@ -194,13 +206,21 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
             onChange={(e) => {
               // User typed something new — clear any active pin
               if (pinLocation) setPinLocation(null);
+              // Re-open the dropdown if it was closed (e.g. after clicking outside)
+              if (searchMode === "map") setOpen(true);
               setQuery(e.target.value);
             }}
             onFocus={() => {
               setFocused(true);
               if (searchMode === "map" || results.length > 0 || pinLocation) setOpen(true);
             }}
-            onBlur={() => { setFocused(false); setTimeout(() => { if (!dropdownHoveredRef.current) setOpen(false); }, 150); }}
+            onBlur={() => {
+              setFocused(false);
+              // In map mode the outside-click handler manages close; don't fight it.
+              if (searchMode !== "map") {
+                setTimeout(() => { if (!dropdownHoveredRef.current) setOpen(false); }, 150);
+              }
+            }}
             className="w-full bg-transparent text-[14px] text-[#1A1D23] outline-none"
           />
 
@@ -226,7 +246,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           <div className="relative group/tip">
             <button
               type="button"
-              onMouseDown={() => handleModeChange("text")}
+              onMouseDown={(e) => { e.preventDefault(); handleModeChange("text"); }}
               aria-label="Text search"
               className={`p-1.5 rounded-md transition-colors ${
                 searchMode === "text" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"
@@ -241,7 +261,7 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
           <div className="relative group/tip2">
             <button
               type="button"
-              onMouseDown={() => handleModeChange("map")}
+              onMouseDown={(e) => { e.preventDefault(); handleModeChange("map"); }}
               aria-label="Map search"
               className={`p-1.5 rounded-md transition-colors ${
                 searchMode === "map" ? "text-[#003DA5]" : "text-[#777D88] hover:text-[#1A1D23]"

@@ -24,6 +24,7 @@ import SortableStopCard from "@/components/SortableStopCard";
 import DashboardSelector from "@/components/DashboardSelector";
 import AuthButton from "@/components/auth/AuthButton";
 import AuthModal from "@/components/auth/AuthModal";
+import AboutModal from "@/components/AboutModal";
 import type { Stop, DashboardLibrary } from "@/lib/types";
 import {
   loadLibrary,
@@ -41,7 +42,8 @@ export default function Home() {
   const [library, setLibrary]   = useState<DashboardLibrary>(defaultLibrary);
   const [hydrated, setHydrated] = useState(false);
   const [user, setUser]         = useState<User | null>(null);
-  const [authModal, setAuthModal] = useState(false);
+  const [authModal, setAuthModal]   = useState(false);
+  const [aboutModal, setAboutModal] = useState(false);
   const isLocalWriteRef           = useRef(false);
 
   // ── Auth init + session listener ──────────────────────────────────────────
@@ -237,6 +239,18 @@ export default function Home() {
           </DndContext>
         )}
       </main>
+
+      {/* Signature */}
+      <div className="px-4 pb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setAboutModal(true)}
+          className="text-[13px] text-[#777D88] hover:text-[#1A1D23] transition-colors"
+        >
+          created by Will Crum
+        </button>
+      </div>
+      {aboutModal && <AboutModal onClose={() => setAboutModal(false)} />}
     </div>
   );
 }

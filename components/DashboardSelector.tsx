@@ -1,12 +1,28 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { LayoutDashboard, ChevronDown, Plus, Check, Pencil, X } from "lucide-react";
-import type { DashboardLibrary } from "@/lib/types";
+import { LayoutDashboard, ChevronDown, Plus, Check, Pencil, X, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { DashboardLibrary, Dashboard } from "@/lib/types";
 import {
   createDashboard,
   renameDashboard,
   deleteDashboard,
   setActiveId,
+  reorderDashboards,
 } from "@/lib/dashboard-storage";
 
 interface Props {
@@ -14,15 +30,150 @@ interface Props {
   onMutate: (lib: DashboardLibrary) => Promise<void>;
 }
 
+// ── Sortable row ─────────────────────────────────────────────────────────────
+
+interface RowProps {
+  dash: Dashboard;
+  isActive: boolean;
+  isRenaming: boolean;
+  onlyOne: boolean;
+  renameValue: string;
+  renameInputRef: React.RefObject<HTMLInputElement | null>;
+  onSwitch: (id: string) => void;
+  onRenameClick: (e: React.MouseEvent, id: string, name: string) => void;
+  onRenameChange: (val: string) => void;
+  onRenameBlur: () => void;
+  onRenameKey: (e: React.KeyboardEvent) => void;
+  onDelete: (e: React.MouseEvent, id: string) => void;
+}
+
+function SortableDashboardRow({
+  dash, isActive, isRenaming, onlyOne,
+  renameValue, renameInputRef,
+  onSwitch, onRenameClick, onRenameChange, onRenameBlur, onRenameKey, onDelete,
+}: RowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: dash.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: isDragging ? ("relative" as const) : undefined,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={() => { if (!isDragging) onSwitch(dash.id); }}
+      className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
+        isActive ? "bg-[#E6E8EE]" : "hover:bg-[#E6E8EE]"
+      }`}
+    >
+      {/* Drag handle — left, same hover treatment as pencil/X */}
+      <div className="flex-shrink-0 opacity-40 md:opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 rounded hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23] transition-colors cursor-grab active:cursor-grabbing"
+          aria-label={`Drag to reorder ${dash.name}`}
+        >
+          <GripVertical size={13} />
+        </button>
+      </div>
+
+      {/* Active checkmark */}
+      <div className="w-5 flex-shrink-0 flex items-center justify-center">
+        {isActive && <Check size={14} className="text-[#003DA5]" strokeWidth={2.5} />}
+      </div>
+
+      {/* Name or rename input */}
+      {isRenaming ? (
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <input
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(e) => onRenameChange(e.target.value.slice(0, 30))}
+            onBlur={onRenameBlur}
+            onKeyDown={onRenameKey}
+            onClick={(e) => e.stopPropagation()}
+            maxLength={30}
+            className={`w-full text-[13px] font-medium text-[#1A1D23] bg-white rounded px-1.5 py-0.5 outline-none border focus:bg-white ${
+              renameValue.length >= 30 ? "border-red-500" : "border-[#003DA5]"
+            }`}
+          />
+          {renameValue.length >= 20 && (
+            <span
+              onClick={(e) => e.stopPropagation()}
+              className={`text-[10px] text-right leading-none ${
+                renameValue.length >= 30 ? "text-red-500 font-semibold" : "text-[#777D88]"
+              }`}
+            >
+              {renameValue.length}/30
+            </span>
+          )}
+        </div>
+      ) : (
+        <span className={`flex-1 min-w-0 text-[13px] truncate ${
+          isActive ? "font-semibold text-[#1A1D23]" : "font-medium text-[#1A1D23]"
+        }`}>
+          {dash.name}
+        </span>
+      )}
+
+      {/* Pencil + X — desktop: hidden until hover. Mobile: visible at reduced opacity. */}
+      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 md:opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          type="button"
+          onMouseDown={(e) => onRenameClick(e, dash.id, dash.name)}
+          className="p-1 rounded hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23] transition-colors"
+          aria-label={`Rename ${dash.name}`}
+        >
+          <Pencil size={13} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => onDelete(e, dash.id)}
+          disabled={onlyOne}
+          className={`p-1 rounded transition-colors ${
+            onlyOne
+              ? "opacity-30 cursor-not-allowed text-[#777D88]"
+              : "hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23]"
+          }`}
+          aria-label={`Delete ${dash.name}`}
+        >
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function DashboardSelector({ library, onMutate }: Props) {
-  const [open, setOpen]           = useState(false);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [open, setOpen]               = useState(false);
+  const [renamingId, setRenamingId]   = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef   = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  const active = library.dashboards.find((d) => d.id === library.activeId);
+  const active  = library.dashboards.find((d) => d.id === library.activeId);
   const onlyOne = library.dashboards.length === 1;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   // Close on outside click
   useEffect(() => {
@@ -65,21 +216,19 @@ export default function DashboardSelector({ library, onMutate }: Props) {
   }, [renamingId, renameValue, library]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleRenameKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+    if (e.key === "Enter")  { e.preventDefault(); commitRename(); }
     if (e.key === "Escape") { setRenamingId(null); setRenameValue(""); }
   }
 
   function handleSwitch(id: string) {
-    if (renamingId) return; // don't switch while renaming
-    const lib = setActiveId(library, id);
-    update(lib);
+    if (renamingId) return;
+    update(setActiveId(library, id));
     setOpen(false);
   }
 
   function handleNew() {
     const lib = createDashboard(library);
     update(lib);
-    // Enter rename mode for the new dashboard immediately
     const newDash = lib.dashboards[lib.dashboards.length - 1];
     startRename(newDash.id, newDash.name);
   }
@@ -95,9 +244,17 @@ export default function DashboardSelector({ library, onMutate }: Props) {
     startRename(id, name);
   }
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active: dragActive, over } = event;
+    if (!over || dragActive.id === over.id) return;
+    const oldIndex = library.dashboards.findIndex((d) => d.id === dragActive.id);
+    const newIndex  = library.dashboards.findIndex((d) => d.id === over.id);
+    update(reorderDashboards(library, arrayMove(library.dashboards, oldIndex, newIndex)));
+  }
+
   return (
     <div ref={containerRef} className="relative w-full md:w-[220px] flex-shrink-0">
-      {/* Trigger pill — matches search bar height and style */}
+      {/* Trigger pill */}
       <button
         type="button"
         onClick={() => { commitRename(); setOpen((v) => !v); }}
@@ -131,87 +288,36 @@ export default function DashboardSelector({ library, onMutate }: Props) {
             New dashboard
           </button>
 
-          {/* Dashboard list */}
+          {/* Sortable dashboard list */}
           <div className="py-1">
-            {library.dashboards.map((dash) => {
-              const isActive = dash.id === library.activeId;
-              const isRenaming = renamingId === dash.id;
-
-              return (
-                <div
-                  key={dash.id}
-                  onClick={() => handleSwitch(dash.id)}
-                  className={`group flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
-                    isActive ? "bg-[#E6E8EE]" : "hover:bg-[#E6E8EE]"
-                  }`}
-                >
-                  {/* Active checkmark */}
-                  <div className="w-5 flex-shrink-0 flex items-center justify-center">
-                    {isActive && <Check size={14} className="text-[#003DA5]" strokeWidth={2.5} />}
-                  </div>
-
-                  {/* Name or rename input */}
-                  {isRenaming ? (
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <input
-                        ref={renameInputRef}
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value.slice(0, 30))}
-                        onBlur={commitRename}
-                        onKeyDown={handleRenameKey}
-                        onClick={(e) => e.stopPropagation()}
-                        maxLength={30}
-                        className={`w-full text-[13px] font-medium text-[#1A1D23] bg-white rounded px-1.5 py-0.5 outline-none border focus:bg-white ${
-                          renameValue.length >= 30 ? "border-red-500" : "border-[#003DA5]"
-                        }`}
-                      />
-                      {renameValue.length >= 20 && (
-                        <span
-                          onClick={(e) => e.stopPropagation()}
-                          className={`text-[10px] text-right leading-none ${
-                            renameValue.length >= 30 ? "text-red-500 font-semibold" : "text-[#777D88]"
-                          }`}
-                        >
-                          {renameValue.length}/30
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className={`flex-1 min-w-0 text-[13px] truncate ${
-                      isActive ? "font-semibold text-[#1A1D23]" : "font-medium text-[#1A1D23]"
-                    }`}>
-                      {dash.name}
-                    </span>
-                  )}
-
-                  {/* Action buttons */}
-                  {/* Desktop: hidden until hover. Mobile: visible at reduced opacity. */}
-                  <div className="flex items-center gap-0.5 flex-shrink-0 opacity-40 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onMouseDown={(e) => handleRenameClick(e, dash.id, dash.name)}
-                      className="p-1 rounded hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23] transition-colors"
-                      aria-label={`Rename ${dash.name}`}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => handleDelete(e, dash.id)}
-                      disabled={onlyOne}
-                      className={`p-1 rounded transition-colors ${
-                        onlyOne
-                          ? "opacity-30 cursor-not-allowed text-[#777D88]"
-                          : "hover:bg-[#DCDEE3] text-[#777D88] hover:text-[#1A1D23]"
-                      }`}
-                      aria-label={`Delete ${dash.name}`}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={library.dashboards.map((d) => d.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {library.dashboards.map((dash) => (
+                  <SortableDashboardRow
+                    key={dash.id}
+                    dash={dash}
+                    isActive={dash.id === library.activeId}
+                    isRenaming={renamingId === dash.id}
+                    onlyOne={onlyOne}
+                    renameValue={renameValue}
+                    renameInputRef={renameInputRef}
+                    onSwitch={handleSwitch}
+                    onRenameClick={handleRenameClick}
+                    onRenameChange={setRenameValue}
+                    onRenameBlur={commitRename}
+                    onRenameKey={handleRenameKey}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       )}
