@@ -86,6 +86,10 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
   useEffect(() => {
     if (!open) return;
     function onOutsideMouseDown(e: MouseEvent) {
+      // If the target was removed from the DOM before this event bubbled up
+      // (e.g. a place result button that got cleared by selectPlace), treat it
+      // as an inside click so the dropdown stays open.
+      if (!document.contains(e.target as Node)) return;
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
