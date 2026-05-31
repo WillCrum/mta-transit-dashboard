@@ -305,7 +305,7 @@ export default function MapSearchDropdown({
               }}
             >
               <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-                <StopTooltip name={stop.name} lines={stop.lines} />
+                <StopTooltip name={stop.name} lines={stop.lines} direction={stop.direction} />
               </Tooltip>
             </CircleMarker>
           );

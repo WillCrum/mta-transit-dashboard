@@ -364,19 +364,46 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
                     </div>
                   );
                 })
-              ) : (
-                // Normal line-browse — flat list
-                <div>
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
-                    {query.slice(1).toUpperCase()} · {results.length} stop{results.length !== 1 ? "s" : ""}
-                  </p>
-                  <div className="divide-y divide-[#ECEDF0]">
-                    {results.map((stop) => (
-                      <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
-                    ))}
+              ) : (() => {
+                const lineCode = query.slice(1).toUpperCase();
+                const hasDirections = results.some((s) => s.direction);
+                if (hasDirections) {
+                  const groups = new Map<string, Stop[]>();
+                  for (const stop of results) {
+                    const dir = stop.direction ?? "Other";
+                    if (!groups.has(dir)) groups.set(dir, []);
+                    groups.get(dir)!.push(stop);
+                  }
+                  return (
+                    <>
+                      {Array.from(groups.entries()).map(([dir, stops]) => (
+                        <div key={dir}>
+                          <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                            {lineCode} · {dir} · {stops.length} stop{stops.length !== 1 ? "s" : ""}
+                          </p>
+                          <div className="divide-y divide-[#ECEDF0]">
+                            {stops.map((stop) => (
+                              <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  );
+                }
+                return (
+                  <div>
+                    <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
+                      {lineCode} · {results.length} stop{results.length !== 1 ? "s" : ""}
+                    </p>
+                    <div className="divide-y divide-[#ECEDF0]">
+                      {results.map((stop) => (
+                        <StopButton key={stop.id} stop={stop} onSelect={select} selectedIds={selectedIds} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ) : (
             <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-[#ECEDF0]">
