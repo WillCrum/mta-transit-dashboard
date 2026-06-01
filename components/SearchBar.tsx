@@ -368,15 +368,15 @@ export default function SearchBar({ onSelect, selectedIds }: Props) {
                 const lineCode = query.slice(1).toUpperCase();
                 const hasDirections = results.some((s) => s.direction);
                 if (hasDirections) {
-                  const groups = new Map<string, Stop[]>();
+                  const groups: Record<string, Stop[]> = {};
                   for (const stop of results) {
                     const dir = stop.direction ?? "Other";
-                    if (!groups.has(dir)) groups.set(dir, []);
-                    groups.get(dir)!.push(stop);
+                    if (!groups[dir]) groups[dir] = [];
+                    groups[dir].push(stop);
                   }
                   return (
                     <>
-                      {Array.from(groups.entries()).map(([dir, stops]) => (
+                      {Object.entries(groups).map(([dir, stops]) => (
                         <div key={dir}>
                           <p className="px-4 pt-3 pb-1 text-[10px] font-semibold text-[#777D88] tracking-widest uppercase">
                             {lineCode} · {dir} · {stops.length} stop{stops.length !== 1 ? "s" : ""}
